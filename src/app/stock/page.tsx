@@ -367,7 +367,7 @@ export default function StockPage() {
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = "scale(1)";
                       }}
-                      onClick={() => openImageModal(imageSrc, itemName)}
+                      onClick={() => openImageModal(imagePath, itemName)}
                       onError={(e) => {
                         // Hide image on error and show placeholder
                         e.currentTarget.style.display = "none";
