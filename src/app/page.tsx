@@ -276,7 +276,7 @@ export default function HomePage() {
                   }}>
                     {item.image && (
                       <img
-                        src={`/${item.image}`}
+                        src={item.image.startsWith('http') ? item.image : `https://drive.google.com/uc?export=view&id=${item.image}`}
                         alt={item.namaBarang}
                         style={{
                           width: 50,
@@ -284,6 +284,10 @@ export default function HomePage() {
                           objectFit: 'contain',
                           borderRadius: 4,
                           background: 'white'
+                        }}
+                        onError={(e) => {
+                          // Hide image on error
+                          e.currentTarget.style.display = "none";
                         }}
                       />
                     )}

@@ -1,601 +1,323 @@
-# Google Apps Script Setup for Stationery Management System
+# Google Apps Script for Stationery Management System
 
-This document provides the complete Google Apps Script code needed to handle all operations for the stationery management system.
+This Google Apps Script handles both Google Sheets operations and Google Drive image uploads for the stationery management system.
 
 ## Setup Instructions
 
 1. Go to [Google Apps Script](https://script.google.com/)
 2. Create a new project
-3. Replace the default code with the code below
-4. Deploy as a web app
-5. Set access to "Anyone"
-6. Copy the web app URL and update it in `src/lib/google-apps-script.ts`
+3. Replace the default code with the script below
+4. Deploy as a web app with the following settings:
+   - Execute as: "Me"
+   - Who has access: "Anyone"
+5. Copy the web app URL and update it in your application
 
 ## Complete Google Apps Script Code
 
 ```javascript
+// Google Apps Script for Stationery Management System
+// Handles both Google Sheets operations and Google Drive image uploads
+
+// Configuration
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // Replace with your actual spreadsheet ID
+const DRIVE_FOLDER_ID = 'YOUR_DRIVE_FOLDER_ID_HERE'; // Replace with your Google Drive folder ID
+
 function doGet(e) {
-  return handleRequest(e);
+  const action = e.parameter.action;
+  
+  try {
+    switch (action) {
+      case 'getItems':
+        return ContentService.createTextOutput(JSON.stringify(getItems())).setMimeType(ContentService.MimeType.JSON);
+      case 'getLogs':
+        return ContentService.createTextOutput(JSON.stringify(getLogs())).setMimeType(ContentService.MimeType.JSON);
+      case 'getRequests':
+        return ContentService.createTextOutput(JSON.stringify(getRequests())).setMimeType(ContentService.MimeType.JSON);
+      default:
+        return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid action' })).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ error: error.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doPost(e) {
-  return handleRequest(e);
-}
-
-function handleRequest(e) {
-  let allParams = {};
-  let action = '';
-
-  if (e.postData && e.postData.contents) {
-    try {
-      allParams = JSON.parse(e.postData.contents);
-      action = allParams.action;
-    } catch (parseError) {
-      console.error('Error parsing POST data:', parseError);
-    }
-  } else if (e.parameter) {
-    allParams = e.parameter;
-    action = allParams.action;
-  }
-
-  console.log('Received action:', action, 'with params:', allParams);
-
-  let result;
-  switch(action) {
-    case 'getItems':
-      result = getItems();
-      break;
-    case 'getLogs':
-      result = getLogs();
-      break;
-    case 'getRequests':
-      result = getRequests();
-      break;
-    case 'addItem':
-      result = addItem(allParams);
-      break;
-    case 'restockItem':
-      result = restockItem(allParams);
-      break;
-    case 'editItem':
-      result = editItem(allParams);
-      break;
-    case 'logUsage':
-      result = logUsage(allParams);
-      break;
-    case 'updateLogStatus':
-      result = updateLogStatus(allParams);
-      break;
-    case 'test':
-      result = { message: 'Apps Script is working!', timestamp: new Date().toISOString() };
-      break;
-    default:
-      result = { error: 'Unknown or missing action' };
-  }
-
-  return ContentService
-    .createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// Format date to Malaysian format: DD/MM/YYYY HH:MM:SS
-function formatMalaysianDateTime(date) {
-  // Use Google Apps Script's Utilities.formatDate to force Malaysia time
-  return Utilities.formatDate(date, 'Asia/Kuala_Lumpur', 'dd/MM/yyyy HH:mm:ss');
-}
-
-function getItems() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ITEMLOG');
-  if (!sheet) {
-    throw new Error('ITEMLOG sheet not found');
-  }
+  const data = JSON.parse(e.postData.contents);
+  const action = data.action;
   
+  try {
+    switch (action) {
+      case 'addItem':
+        return ContentService.createTextOutput(JSON.stringify(addItemToSheet(data))).setMimeType(ContentService.MimeType.JSON);
+      case 'logUsage':
+        return ContentService.createTextOutput(JSON.stringify(logUsageToSheet(data))).setMimeType(ContentService.MimeType.JSON);
+      case 'updateLogStatus':
+        return ContentService.createTextOutput(JSON.stringify(updateLogStatusInSheet(data))).setMimeType(ContentService.MimeType.JSON);
+      case 'restockItem':
+        return ContentService.createTextOutput(JSON.stringify(restockItemInSheet(data))).setMimeType(ContentService.MimeType.JSON);
+      case 'editItem':
+        return ContentService.createTextOutput(JSON.stringify(editItemInSheet(data))).setMimeType(ContentService.MimeType.JSON);
+      case 'uploadImage':
+        return ContentService.createTextOutput(JSON.stringify(uploadImageToDrive(data))).setMimeType(ContentService.MimeType.JSON);
+      case 'deleteImage':
+        return ContentService.createTextOutput(JSON.stringify(deleteImageFromDrive(data))).setMimeType(ContentService.MimeType.JSON);
+      default:
+        return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid action' })).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ error: error.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Google Sheets Operations
+function getItems() {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('ITEMLOG');
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const rows = data.slice(1); // Skip header row
+  const items = [];
   
-  return rows.map(row => {
-    const obj = {};
-    for (let i = 0; i < headers.length; i++) {
-      obj[headers[i]] = row[i];
-    }
-    return obj;
-  });
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const item = {
+      id: row[0],
+      namaBarang: row[1],
+      bilangan: row[2],
+      image: row[3],
+      bilLog1: row[4],
+      bilLog2: row[5],
+      bilLog3: row[6],
+      bilLog4: row[7],
+      bilLog5: row[8],
+      bilLog6: row[9],
+      bilLog7: row[10],
+      bilLog8: row[11],
+      bilLog9: row[12],
+      bilLog10: row[13],
+      total: row[14],
+      current: row[15]
+    };
+    items.push(item);
+  }
+  
+  return items;
 }
 
 function getLogs() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LOG');
-  if (!sheet) {
-    throw new Error('LOG sheet not found');
-  }
-  
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('LOG');
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const rows = data.slice(1); // Skip header row
-
-  return rows.map(row => {
-    const obj = {};
-    for (let i = 0; i < headers.length; i++) {
-      obj[headers[i]] = row[i];
-    }
-
-    // Build items array from NAMA BARANG*X and BILANGAN*X
-    const items = [];
-    for (let i = 1; i <= 10; i++) {
-      const nama = obj[`NAMA BARANG*${i}`] || obj[`NAMA BARANG *${i}`];
-      const bil = obj[`BILANGAN*${i}`];
-      if (nama && bil) {
-        items.push({ namaBarang: nama, bilangan: bil });
-      }
-    }
-    obj.items = items;
-
-    // Add PDF_LINK alias for compatibility
-    obj['PDF_LINK'] = obj['[Document Studio] File Link #Iso9pkez'] || obj['[Document Studio] File Link'] || '';
-
-    // Map to expected frontend fields
-    return {
-      id: obj['ID'],
-      tarikhDanMasa: obj['TARIKH DAN MASA'],
-      email: obj['EMAIL'],
-      department: obj['DEPARTMENT'],
-      items: obj.items,
-      status: obj['STATUS'],
-      // PDF_LINK: obj['PDF_LINK'],
+  const logs = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const log = {
+      id: row[0],
+      tarikhDanMasa: row[1],
+      email: row[2],
+      department: row[3],
+      items: JSON.parse(row[4] || '[]'),
+      status: row[5]
     };
-  });
+    logs.push(log);
+  }
+  
+  return logs;
 }
 
-// NEW FUNCTION: Get requests for admin page (formatted for frontend)
 function getRequests() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LOG');
-  if (!sheet) {
-    throw new Error('LOG sheet not found');
-  }
-  
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1); // Skip header row
-
-  return rows.map(row => {
-    const obj = {};
-    for (let i = 0; i < headers.length; i++) {
-      obj[headers[i]] = row[i];
-    }
-
-    // Build items array from NAMA BARANG*X and BILANGAN*X
-    const items = [];
-    for (let i = 1; i <= 10; i++) {
-      const nama = obj[`NAMA BARANG*${i}`] || obj[`NAMA BARANG *${i}`];
-      const bil = obj[`BILANGAN*${i}`];
-      if (nama && bil) {
-        items.push({ 
-          namaBarang: nama, 
-          bilangan: parseInt(bil) || 0 
-        });
-      }
-    }
-
-    // Return format expected by admin page
-    return {
-      id: parseInt(obj['ID']) || 0,
-      email: obj['EMAIL'] || '',
-      department: obj['DEPARTMENT'] || '',
-      items: items,
-      status: obj['STATUS'] || 'PENDING',
-      logId: parseInt(obj['ID']) || 0
-    };
-  });
+  const logs = getLogs();
+  return logs.filter(log => log.status === 'PENDING');
 }
 
-function addItem(params) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ITEMLOG');
-  if (!sheet) {
-    throw new Error('ITEMLOG sheet not found');
-  }
-  
-  const namaBarang = params.namaBarang;
-  const bilangan = parseInt(params.bilangan) || 0;
-  const image = params.image || '';
-  
-  if (!namaBarang || bilangan <= 0) {
-    throw new Error('Item name and quantity are required');
-  }
-  
-  // Get next ID
-  const lastRow = sheet.getLastRow();
-  const id = lastRow; // or lastRow + 1 if you want to skip header row
-  
-  // Prepare row data
+function addItemToSheet(data) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('ITEMLOG');
   const newRow = [
-    id,
-    namaBarang,
-    bilangan.toString(),
-    image,
-    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // bilLog1-10
-    '0', // total
-    bilangan.toString() // current
+    new Date().getTime(), // ID
+    data.namaBarang,
+    data.bilangan,
+    data.image,
+    data.bilangan, // bilLog1
+    0, // bilLog2
+    0, // bilLog3
+    0, // bilLog4
+    0, // bilLog5
+    0, // bilLog6
+    0, // bilLog7
+    0, // bilLog8
+    0, // bilLog9
+    0, // bilLog10
+    data.bilangan, // total
+    data.bilangan  // current
   ];
   
-  // Add to sheet
+  sheet.appendRow(newRow);
+  return { success: true };
+}
+
+function logUsageToSheet(data) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('LOG');
+  const items = JSON.parse(data.items);
+  
+  const newRow = [
+    new Date().getTime(), // ID
+    new Date().toISOString(), // tarikhDanMasa
+    data.email,
+    data.department,
+    JSON.stringify(items),
+    'PENDING'
+  ];
+  
   sheet.appendRow(newRow);
   
-  return { success: true, id: id };
+  // Update ITEMLOG quantities
+  updateItemQuantities(items);
+  
+  return { success: true };
 }
 
-function restockItem(params) {
-  try {
-    const id = Number(params.id);
-    const addQty = Math.max(0, Number(params.addQty) || 0);
-    
-    console.log('Restock request:', { id, addQty });
-    
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ITEMLOG');
-    if (!sheet) {
-      throw new Error('ITEMLOG sheet not found');
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    
-    // Find the current column index
-    const currentColIndex = headers.findIndex(header => header === 'CURRENT');
-    if (currentColIndex === -1) {
-      throw new Error('CURRENT column not found');
-    }
-    
-    // Find the row with matching ID
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (Number(data[i][0]) === id) {
-        rowIndex = i;
-        break;
-      }
-    }
-    
-    if (rowIndex === -1) {
-      throw new Error(`Item with ID ${id} not found`);
-    }
-    
-    // Get current value and calculate new value
-    const currentValue = Number(data[rowIndex][currentColIndex]) || 0;
-    const newValue = currentValue + addQty;
-    
-    // Update the cell
-    const range = sheet.getRange(rowIndex + 1, currentColIndex + 1);
-    range.setValue(newValue);
-    
-    // Verify the update
-    const updatedValue = range.getValue();
-    if (Number(updatedValue) !== newValue) {
-      throw new Error('Failed to update value');
-    }
-    
-    console.log('Restock successful:', {
-      id,
-      oldValue: currentValue,
-      addQty,
-      newValue: updatedValue
-    });
-    
-    return {
-      success: true,
-      id,
-      oldStock: currentValue,
-      addQty,
-      newStock: updatedValue
-    };
-    
-  } catch (error) {
-    console.error('Restock error:', error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-function editItem(params) {
-  const id = params.id;
-  const newName = params.namaBarang;
-  const newImage = params.image;
-  const newCurrent = params.current;
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ITEMLOG');
+function updateLogStatusInSheet(data) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('LOG');
+  const dataRange = sheet.getDataRange().getValues();
   
-  if (!sheet) {
-    throw new Error('ITEMLOG sheet not found');
-  }
-  
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == id) { // assuming ID is in column 0
-      if (newName !== undefined) {
-        sheet.getRange(i+1, 2).setValue(newName); // column 2 is NAMA BARANG
-      }
-      if (newImage !== undefined) {
-        sheet.getRange(i+1, 4).setValue(newImage); // column 4 is IMAGE
-      }
-      if (newCurrent !== undefined) {
-        sheet.getRange(i+1, 16).setValue(newCurrent); // column 16 is CURRENT
-      }
-      return { success: true };
-    }
-  }
-  throw new Error('Item not found');
-}
-
-function logUsage(params) {
-  console.log('Starting logUsage with params:', JSON.stringify(params));
-  
-  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LOG');
-  const itemSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ITEMLOG');
-  
-  console.log('Sheets found:', {
-    logSheet: !!logSheet,
-    itemSheet: !!itemSheet
-  });
-  
-  if (!logSheet || !itemSheet) throw new Error('Required sheets not found');
-
-  const email = params.email;
-  const department = params.department;
-  let items = [];
-  
-  console.log('Processing items parameter:', typeof params.items, params.items);
-  
-  if (Array.isArray(params.items)) {
-    items = params.items;
-  } else if (typeof params.items === 'string') {
-    try { 
-      items = JSON.parse(params.items);
-      console.log('Parsed items from string:', items);
-    } catch (err) {
-      console.error('Failed to parse items:', err);
-      throw new Error('Invalid items JSON');
-    }
-  }
-  
-  if (!email || !department || !items || items.length === 0) {
-    console.error('Validation failed:', { email, department, itemsLength: items?.length });
-    throw new Error('Email, department, and items are required');
-  }
-
-  // Get next log ID
-  const lastLogRow = logSheet.getLastRow();
-  const logId = lastLogRow;
-  
-  console.log('Generated logId:', logId);
-
-  // Format date in Malaysian format
-  const timestamp = Utilities.formatDate(new Date(), 'Asia/Kuala_Lumpur', 'dd/MM/yyyy HH:mm:ss');
-
-  // Prepare log entry
-  const logRow = [logId, timestamp, email, department];
-  for (let i = 0; i < 10; i++) {
-    if (i < items.length) {
-      logRow.push(items[i].namaBarang, items[i].bilangan.toString());
-    } else {
-      logRow.push('', '0');
-    }
-  }
-  logRow.push('PENDING'); // status
-  logRow.push(''); // [Document Studio] File Status
-  logRow.push(''); // [Document Studio] File Link
-
-  console.log('Prepared log row:', logRow);
-
-  try {
-    // Add to LOG sheet
-    logSheet.appendRow(logRow);
-    console.log('Successfully added log row');
-
-    // Deduct stock for each item
-    console.log('Starting stock deduction...');
-    const itemData = itemSheet.getDataRange().getValues();
-    
-    for (let j = 0; j < items.length; j++) {
-      const itemName = items[j].namaBarang;
-      const qty = parseInt(items[j].bilangan);
-      console.log('Processing item:', { itemName, qty });
+  for (let i = 1; i < dataRange.length; i++) {
+    if (dataRange[i][0] == data.id) {
+      sheet.getRange(i + 1, 6).setValue(data.status);
       
-      let found = false;
-      for (let k = 1; k < itemData.length; k++) {
-        if (itemData[k][1] == itemName) {
-          found = true;
-          const current = parseInt(itemData[k][15]) || 0; // CURRENT is in column 16 (index 15)
-          const newCurrent = Math.max(0, current - qty);
-          console.log('Updating stock:', { 
-            item: itemName, 
-            row: k+1, 
-            oldStock: current, 
-            deduction: qty, 
-            newStock: newCurrent 
-          });
-          itemSheet.getRange(k+1, 16).setValue(newCurrent);
-          break;
-        }
+      if (data.status === 'APPROVE') {
+        const items = JSON.parse(data.items);
+        updateItemQuantities(items);
       }
-      if (!found) {
-        console.warn(`Item not found in ITEMLOG: ${itemName}`);
-      }
-    }
-    console.log('Stock deduction completed');
-
-    return { success: true, logId: logId };
-  } catch (error) {
-    console.error('Error in logUsage:', error);
-    throw error;
-  }
-}
-
-function updateLogStatus(params) {
-  console.log('Starting updateLogStatus with params:', JSON.stringify(params));
-  
-  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LOG');
-  if (!logSheet) throw new Error('LOG sheet not found');
-
-  // Accept both logId and id
-  const logId = params.logId || params.id;
-  const newStatus = params.status;
-  let items = [];
-  
-  console.log('Processing request:', { logId, newStatus });
-  
-  if (Array.isArray(params.items)) {
-    items = params.items;
-  } else if (typeof params.items === 'string') {
-    try { 
-      items = JSON.parse(params.items);
-      console.log('Parsed items from string:', items);
-    } catch (err) {
-      console.warn('Failed to parse items:', err);
-      // Don't throw error here as items are optional for status update
-    }
-  }
-
-  if (!logId || !newStatus) {
-    console.error('Missing required fields:', { logId, newStatus });
-    throw new Error('Log ID and status are required');
-  }
-
-  // Validate status
-  const validStatuses = ['PENDING', 'APPROVE', 'DECLINE', 'APPLY'];
-  if (!validStatuses.includes(newStatus)) {
-    console.error('Invalid status:', newStatus);
-    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
-  }
-
-  // Find the log entry
-  const data = logSheet.getDataRange().getValues();
-  let logRowIndex = -1;
-
-  console.log('Searching for log entry with ID:', logId);
-  
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(logId)) {
-      logRowIndex = i + 1;
-      console.log('Found log entry at row:', logRowIndex);
       break;
     }
   }
+  
+  return { success: true };
+}
 
-  if (logRowIndex === -1) {
-    console.error('Log entry not found for ID:', logId);
-    throw new Error('Log entry not found');
+function restockItemInSheet(data) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('ITEMLOG');
+  const dataRange = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < dataRange.length; i++) {
+    if (dataRange[i][0] == data.id) {
+      const currentQty = dataRange[i][15]; // current column
+      const newQty = currentQty + data.addQty;
+      
+      sheet.getRange(i + 1, 16).setValue(newQty); // current
+      sheet.getRange(i + 1, 15).setValue(newQty); // total
+      break;
+    }
   }
+  
+  return { success: true };
+}
 
-  try {
-    // Update the status (Column Y - index 24)
-    console.log('Updating status to:', newStatus, 'at row:', logRowIndex);
-    logSheet.getRange(logRowIndex, 25).setValue(newStatus);
+function editItemInSheet(data) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('ITEMLOG');
+  const dataRange = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < dataRange.length; i++) {
+    if (dataRange[i][0] == data.id) {
+      sheet.getRange(i + 1, 2).setValue(data.namaBarang); // namaBarang
+      sheet.getRange(i + 1, 4).setValue(data.image); // image
+      break;
+    }
+  }
+  
+  return { success: true };
+}
 
-    // Handle stock restoration for DECLINE
-    if (newStatus === 'DECLINE' && items.length > 0) {
-      console.log('Processing stock restoration for declined request');
-      const itemSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ITEMLOG');
-      if (itemSheet) {
-        const itemData = itemSheet.getDataRange().getValues();
-        for (let j = 0; j < items.length; j++) {
-          const itemName = items[j].namaBarang;
-          const qty = parseInt(items[j].bilangan);
-          console.log('Restoring stock for:', { itemName, qty });
-          
-          let found = false;
-          for (let k = 1; k < itemData.length; k++) {
-            if (itemData[k][1] == itemName) {
-              found = true;
-              const current = parseInt(itemData[k][15]) || 0;
-              const newCurrent = current + qty;
-              console.log('Updating stock:', {
-                item: itemName,
-                row: k+1,
-                oldStock: current,
-                addition: qty,
-                newStock: newCurrent
-              });
-              itemSheet.getRange(k+1, 16).setValue(newCurrent);
-              break;
-            }
-          }
-          if (!found) {
-            console.warn(`Item not found in ITEMLOG: ${itemName}`);
-          }
-        }
+function updateItemQuantities(items) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('ITEMLOG');
+  const dataRange = sheet.getDataRange().getValues();
+  
+  items.forEach(item => {
+    for (let i = 1; i < dataRange.length; i++) {
+      if (dataRange[i][1] === item.namaBarang) {
+        const currentQty = dataRange[i][15]; // current column
+        const newQty = Math.max(0, currentQty - item.bilangan);
+        
+        sheet.getRange(i + 1, 16).setValue(newQty); // current
+        break;
       }
     }
+  });
+}
 
-    return { 
-      success: true, 
-      message: 'Status updated successfully', 
-      logId: logId, 
-      status: newStatus 
+// Google Drive Operations
+function uploadImageToDrive(data) {
+  try {
+    // Decode base64 data
+    const fileData = Utilities.base64Decode(data.fileData);
+    const blob = Utilities.newBlob(fileData, data.mimeType, data.fileName);
+    
+    // Get the target folder
+    const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    
+    // Create file in the folder
+    const file = folder.createFile(blob);
+    
+    // Set file permissions to anyone with the link can view
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    return {
+      success: true,
+      id: file.getId(),
+      name: file.getName(),
+      webViewLink: file.getUrl(),
+      webContentLink: `https://drive.google.com/uc?export=view&id=${file.getId()}`
     };
   } catch (error) {
-    console.error('Error in updateLogStatus:', error);
-    throw error;
+    return { error: error.toString() };
   }
 }
 
-function listImageFiles() {
+function deleteImageFromDrive(data) {
   try {
-    const folder = DriveApp.getFoldersByName('ITEMLOG_Images').next();
-    const files = folder.getFiles();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('ImageFileIDs');
-    sheet.appendRow(['File Name', 'File ID']);
-    while (files.hasNext()) {
-      const file = files.next();
-      sheet.appendRow([file.getName(), file.getId()]);
-    }
-    return { success: true, message: 'Image files listed successfully' };
+    const file = DriveApp.getFileById(data.fileId);
+    file.setTrashed(true);
+    
+    return { success: true };
   } catch (error) {
-    throw new Error('Error listing image files: ' + error.message);
+    return { error: error.toString() };
   }
 }
 ```
 
-## Sheet Structure
+## Configuration Steps
 
-### ITEMLOG Sheet
-- Column A: ID
-- Column B: NAMA BARANG (Item Name)
-- Column C: BILANGAN (Quantity)
-- Column D: IMAGE
-- Columns E-N: bilLog1 to bilLog10 (Historical logs)
-- Column O: TOTAL
-- Column P: CURRENT (Available stock)
+1. **Get Spreadsheet ID**: Open your Google Sheet and copy the ID from the URL
+   - URL format: `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit`
+   - Replace `SPREADSHEET_ID` in the script
 
-### LOG Sheet
-- Column A: ID
-- Column B: TARIKH DAN MASA (Date & Time)
-- Column C: EMAIL
-- Column D: DEPARTMENT
-- Columns E-W: Items (up to 10 items, alternating NAMA BARANG*X and BILANGAN*X)
-- Column Y: STATUS (PENDING, APPROVE, DECLINE, APPLY)
-- Column Z: [Document Studio] File Status
-- Column AA: [Document Studio] File Link
+2. **Create Google Drive Folder**: 
+   - Go to Google Drive
+   - Create a new folder for storing images
+   - Right-click the folder → Share → Copy link
+   - Extract the folder ID from the URL
+   - Replace `DRIVE_FOLDER_ID` in the script
 
-## Deployment
+3. **Deploy the Script**:
+   - Click "Deploy" → "New deployment"
+   - Choose "Web app"
+   - Set "Execute as" to your account
+   - Set "Who has access" to "Anyone"
+   - Click "Deploy"
+   - Copy the web app URL
 
-1. Click "Deploy" > "New deployment"
-2. Choose "Web app"
-3. Set "Execute as" to your account
-4. Set "Who has access" to "Anyone"
-5. Click "Deploy"
-6. Copy the web app URL
-7. Update the `APPS_SCRIPT_URL` in `src/lib/google-apps-script.ts`
+4. **Update Your Application**:
+   - Replace the `APPS_SCRIPT_URL` in your application files with the new web app URL
+
+## Security Notes
+
+- The script uses "Anyone" access for the web app, which is necessary for Netlify deployment
+- Images are stored in a dedicated Google Drive folder with "Anyone with link can view" permissions
+- Consider implementing additional authentication if needed for production use
 
 ## Testing
 
-After deployment, you can test the endpoints:
-
-- `GET /exec?action=getItems` - Get all items
-- `GET /exec?action=getLogs` - Get all logs
-- `GET /exec?action=getRequests` - Get all requests (for admin)
-- `POST /exec` with action and data - Perform operations
-
-## Notes
-
-- The system now uses Google Sheets as the single source of truth
-- All data is stored in Google Sheets, making it suitable for Netlify deployment
-- The admin page will always show the latest requests from Google Sheets
-- No local JSON files are needed for production 
+After deployment, test the image upload functionality:
+1. Try uploading an image through your application
+2. Check that the image appears in your Google Drive folder
+3. Verify that the image URL is correctly stored in your Google Sheet
+4. Confirm that images display properly in your application 

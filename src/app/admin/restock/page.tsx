@@ -390,12 +390,35 @@ export default function AdminRestockPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   {item["IMAGE"] && (
                     <img
-                      src={`/${item["IMAGE"]}`}
+                      src={item["IMAGE"].startsWith('http') ? item["IMAGE"] : `https://drive.google.com/uc?export=view&id=${item["IMAGE"]}`}
                       alt={item["NAMA BARANG"]}
                       className={styles.itemImage}
                       style={{ cursor: 'pointer', width: 120, height: 120, objectFit: 'contain', background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb' }}
                       onClick={() => openImageModal(item["IMAGE"], item["NAMA BARANG"])}
+                      onError={(e) => {
+                        // Hide image on error and show placeholder
+                        e.currentTarget.style.display = "none";
+                        const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (nextElement) {
+                          nextElement.style.display = "flex";
+                        }
+                      }}
                     />
+                  )}
+                  {!item["IMAGE"] && (
+                    <div style={{ 
+                      display: "flex",
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      width: 120,
+                      height: 120,
+                      background: "#e5eaf1",
+                      borderRadius: "8px",
+                      color: "#64748b",
+                      fontSize: "0.85rem"
+                    }}>
+                      No Image
+                    </div>
                   )}
                   <div style={{ fontWeight: 600, fontSize: 15, textAlign: 'center', marginTop: 4 }}>{item["NAMA BARANG"]}</div>
                   <div style={{ color: '#64748b', fontSize: 13, marginBottom: 4 }}>Current: {item["CURRENT"]}</div>
@@ -461,7 +484,7 @@ export default function AdminRestockPage() {
                 ×
               </button>
               <img
-                src={`/${selectedImage.src}`}
+                src={selectedImage.src.startsWith('http') ? selectedImage.src : `https://drive.google.com/uc?export=view&id=${selectedImage.src}`}
                 alt={selectedImage.alt}
                 style={{
                   maxWidth: "100%",

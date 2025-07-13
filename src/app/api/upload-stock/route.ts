@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { addItem } from "@/lib/google-apps-script";
-import fs from "fs";
-import path from "path";
+import { uploadImageToDrive } from "@/lib/google-drive";
 
 export async function POST(request: Request) {
   try {
@@ -14,19 +13,16 @@ export async function POST(request: Request) {
       throw new Error('No file uploaded');
     }
 
-    // Save to local
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Upload to Google Drive instead of local storage
     const filename = file.name.replace(/\s+/g, "_");
-    const localPath = path.join(process.cwd(), "public", "ITEMLOG_Images", filename);
-    fs.writeFileSync(localPath, buffer);
+    const driveFile = await uploadImageToDrive(file, filename);
 
-    // Add to Google Sheet with all required fields
+    // Add to Google Sheet with Google Drive image URL
     const qty = Number(quantity);
     await addItem({
       namaBarang: name,
       bilangan: qty,
-      image: `ITEMLOG_Images/${filename}`,
+      image: driveFile.webContentLink, // Use Google Drive URL instead of local path
       bilLog1: qty,
       bilLog2: 0,
       bilLog3: 0,
@@ -41,7 +37,11 @@ export async function POST(request: Request) {
       current: qty,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true, 
+      imageUrl: driveFile.webContentLink,
+      driveFileId: driveFile.id 
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

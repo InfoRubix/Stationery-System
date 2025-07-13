@@ -349,7 +349,7 @@ export default function StockPage() {
                 }}>
                   {imagePath ? (
                     <img
-                      src={`/${imagePath}`}
+                      src={imagePath.startsWith('http') ? imagePath : `/${imagePath}`}
                       alt={itemName}
                       style={{
                         maxWidth: "100%",
@@ -365,7 +365,7 @@ export default function StockPage() {
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = "scale(1)";
                       }}
-                      onClick={() => openImageModal(`/${imagePath}`, itemName)}
+                      onClick={() => openImageModal(imagePath.startsWith('http') ? imagePath : `/${imagePath}`, itemName)}
                       onError={(e) => {
                         // Hide image on error and show placeholder
                         e.currentTarget.style.display = "none";

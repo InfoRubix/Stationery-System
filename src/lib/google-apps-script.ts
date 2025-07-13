@@ -1,7 +1,7 @@
 // Google Apps Script integration for stationery management system
 // This replaces the Google Sheets API with a simpler Apps Script web app approach
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjg9nJZpUJVzzAJyBJkwUVKhNUy_-YSMPWFPLAAWe9fCU6LFdltFzT5Uw86JjBcmc/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcCOnAk_OF6gXGl-pxY1RlEwuEAUnyE_7sriH3ga8FnYJAv3HlSpu0CNGgxqaJxET5/exec';
 
 // Types for our data
 export interface ItemLog {
