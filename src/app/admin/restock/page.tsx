@@ -5,6 +5,7 @@ import { getItems } from "@/lib/google-apps-script";
 import { restockItem } from '@/lib/google-apps-script';
 import React from "react";
 import { DotLoader } from "@/components/ui/dot-loader";
+import { getImageSrc } from "@/lib/getImageSrc";
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -388,15 +389,14 @@ export default function AdminRestockPage() {
             items.map((item, idx) => (
               <div key={item.ID || item.id || item["NAMA BARANG"] || idx} className={styles.cardItem} style={{ width: 220, minHeight: 290, padding: 20, borderRadius: 16, boxSizing: 'border-box' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  {item["IMAGE"] && (
+                  {getImageSrc(item["IMAGE"]) ? (
                     <img
-                      src={item["IMAGE"].startsWith('http') ? item["IMAGE"] : `https://drive.google.com/uc?export=view&id=${item["IMAGE"]}`}
+                      src={getImageSrc(item["IMAGE"]) || ''}
                       alt={item["NAMA BARANG"]}
                       className={styles.itemImage}
                       style={{ cursor: 'pointer', width: 120, height: 120, objectFit: 'contain', background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb' }}
                       onClick={() => openImageModal(item["IMAGE"], item["NAMA BARANG"])}
                       onError={(e) => {
-                        // Hide image on error and show placeholder
                         e.currentTarget.style.display = "none";
                         const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
                         if (nextElement) {
@@ -404,8 +404,7 @@ export default function AdminRestockPage() {
                         }
                       }}
                     />
-                  )}
-                  {!item["IMAGE"] && (
+                  ) : (
                     <div style={{ 
                       display: "flex",
                       alignItems: "center", 
@@ -484,7 +483,7 @@ export default function AdminRestockPage() {
                 ×
               </button>
               <img
-                src={selectedImage.src.startsWith('http') ? selectedImage.src : `https://drive.google.com/uc?export=view&id=${selectedImage.src}`}
+                src={getImageSrc(selectedImage.src) || ''}
                 alt={selectedImage.alt}
                 style={{
                   maxWidth: "100%",

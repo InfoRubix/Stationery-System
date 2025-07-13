@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import styles from "../page.module.css";
 import { useCart } from "../../contexts/CartContext";
 import { DotLoader } from "@/components/ui/dot-loader";
+import { getImageSrc } from "@/lib/getImageSrc";
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -324,6 +325,7 @@ export default function StockPage() {
           {items.map(item => {
             const itemName = item["NAMA BARANG"];
             const imagePath = item["IMAGE"]; // Use the IMAGE column from Google Sheets
+            const imageSrc = getImageSrc(imagePath);
             
             return (
               <div
@@ -347,9 +349,9 @@ export default function StockPage() {
                   justifyContent: "center",
                   marginBottom: "12px"
                 }}>
-                  {imagePath ? (
+                  {imageSrc ? (
                     <img
-                      src={imagePath.startsWith('http') ? imagePath : `/${imagePath}`}
+                      src={imageSrc || ''}
                       alt={itemName}
                       style={{
                         maxWidth: "100%",
@@ -365,7 +367,7 @@ export default function StockPage() {
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = "scale(1)";
                       }}
-                      onClick={() => openImageModal(imagePath.startsWith('http') ? imagePath : `/${imagePath}`, itemName)}
+                      onClick={() => openImageModal(imageSrc, itemName)}
                       onError={(e) => {
                         // Hide image on error and show placeholder
                         e.currentTarget.style.display = "none";
@@ -377,7 +379,7 @@ export default function StockPage() {
                     />
                   ) : null}
                   <div style={{ 
-                    display: imagePath ? "none" : "flex",
+                    display: imageSrc ? "none" : "flex",
                     alignItems: "center", 
                     justifyContent: "center",
                     width: "100%",
@@ -483,7 +485,7 @@ export default function StockPage() {
               ×
             </button>
             <img
-              src={selectedImage.src}
+              src={getImageSrc(selectedImage.src) || ''}
               alt={selectedImage.alt}
               style={{
                 maxWidth: "100%",

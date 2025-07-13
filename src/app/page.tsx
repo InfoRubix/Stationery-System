@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import styles from "./page.module.css";
 import { useCart } from "../contexts/CartContext";
 import { DotLoader } from "@/components/ui/dot-loader";
+import { getImageSrc } from "@/lib/getImageSrc";
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -276,7 +277,7 @@ export default function HomePage() {
                   }}>
                     {item.image && (
                       <img
-                        src={item.image.startsWith('http') ? item.image : `https://drive.google.com/uc?export=view&id=${item.image}`}
+                        src={getImageSrc(item.image) || ''}
                         alt={item.namaBarang}
                         style={{
                           width: 50,
@@ -286,7 +287,6 @@ export default function HomePage() {
                           background: 'white'
                         }}
                         onError={(e) => {
-                          // Hide image on error
                           e.currentTarget.style.display = "none";
                         }}
                       />

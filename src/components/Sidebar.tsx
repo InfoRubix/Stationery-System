@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import styles from './Sidebar.module.css';
 import { useCart } from '../contexts/CartContext';
 import { getItems, ItemLog } from '../lib/google-apps-script';
+import { getImageSrc } from "@/lib/getImageSrc";
 
 const navItemsUser = [
   { label: 'Order Stationery', icon: '🛒', href: '/' },
@@ -135,11 +136,10 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
                     <div key={item.id} className={styles.cartItem}>
                       {item.image && (
                         <img
-                          src={item.image.startsWith('http') ? item.image : `https://drive.google.com/uc?export=view&id=${item.image}`}
+                          src={getImageSrc(item.image) || ''}
                           alt={item.namaBarang}
                           className={styles.cartItemImage}
                           onError={(e) => {
-                            // Hide image on error
                             e.currentTarget.style.display = "none";
                           }}
                         />
