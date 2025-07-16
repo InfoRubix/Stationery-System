@@ -10,6 +10,7 @@ import { getImageSrc } from "@/lib/getImageSrc";
 const navItemsUser = [
   { label: 'Order Stationery', icon: '🛒', href: '/' },
   { label: 'List Stock', icon: '📋', href: '/stock' },
+  { label: 'Admin', icon: '👤', href: '/admin' },
 ];
 const navItemsAdmin = [
   { label: 'User Requests', icon: '📥', href: '/admin' },
@@ -67,10 +68,12 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
         style={{ pointerEvents: sidebarOpen ? 'auto' : 'none' }}
       />
       <aside className={styles.sidebar + (sidebarOpen ? ' ' + styles.open : '')}>
-        <div className={styles.logo} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ fontWeight: 700, fontSize: 22, color: '#2563eb', textAlign: 'center' }}>Stationery</span>
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#111', textAlign: 'center', marginTop: 2 }}>By Rubix Technology</span>
-        </div>
+        <Link href="/">
+          <div className={styles.logo} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
+            <span style={{ fontWeight: 700, fontSize: 22, color: '#2563eb', textAlign: 'center' }}>Stationery</span>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#111', textAlign: 'center', marginTop: 2 }}>By Rubix Technology</span>
+          </div>
+        </Link>
         <ul className={styles.navList}>
           {navItems.map((item) => (
             <li

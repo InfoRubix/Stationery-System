@@ -108,8 +108,8 @@ export default function AdminLogHistory() {
     let y = 195; // padding top
     const maxRows = 10;
     const colLeft = 50;
-    const colRight = 350;
-    const colCenter = (colLeft + colRight) / 2;
+    const colRight = 370;
+    const colCenter = (colLeft + colRight);
 
     for (let i = 0; i < maxRows; i++) {
     const item = log.items[i];

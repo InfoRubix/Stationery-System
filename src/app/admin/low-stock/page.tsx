@@ -86,7 +86,7 @@ export default function LowStockPage() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
       doc.text('Item Name', 50, headerY);
-      doc.text('Current Stock', 350, headerY);
+      doc.text('Current Stock', 370, headerY);
       // Draw top border for the table
       doc.setLineWidth(1);
       doc.line(tableLeftX, headerY - 15, tableRightX, headerY - 15); // top border
@@ -109,7 +109,7 @@ export default function LowStockPage() {
         doc.setFontSize(12);
         const item = items[i];
         doc.text(item["NAMA BARANG"] || item.namaBarang || '', 50, y);
-        doc.text(String(item["CURRENT"]), 350, y);
+        doc.text(String(item["CURRENT"]), 420, y);
         // Draw horizontal line after this row
         doc.setLineWidth(1);
         doc.line(tableLeftX, y + 10, tableRightX, y + 10);
