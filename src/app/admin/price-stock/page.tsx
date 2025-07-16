@@ -101,7 +101,7 @@ export default function PriceStockPage() {
             <table className={styles.adminTable}>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>No.</th>
                   <th>NAMA BARANG</th>
                   <th>BASE PRICE</th>
                   <th>TYPE STOCK</th>
@@ -111,7 +111,7 @@ export default function PriceStockPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedItems.map(item => {
+                {paginatedItems.map((item, idx) => {
                   // Gather all tiers
                   const tiers = [];
                   for (let i = 1; i <= 5; i++) {
@@ -122,10 +122,11 @@ export default function PriceStockPage() {
                     }
                   }
                   // Always show at least one row per item
+                  const rowNo = (page - 1) * ITEMS_PER_PAGE + idx + 1;
                   return (
                     <React.Fragment key={item.ID}>
                       <tr>
-                        <td>{item.ID}</td>
+                        <td>{rowNo}</td>
                         <td>{item["NAMA BARANG"]}</td>
                         <td>{item["BASE PRICE"]}</td>
                         <td>{item["TYPE STOCK"]}</td>

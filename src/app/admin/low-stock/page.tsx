@@ -199,14 +199,16 @@ export default function LowStockPage() {
             <table className={styles.adminTable}>
               <thead>
                 <tr>
+                  <th>No.</th>
                   <th>Item Name</th>
                   <th style={{ textAlign: 'center' }}>Current Stock</th>
                   <th >Action</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedItems.map(item => (
+                {paginatedItems.map((item, idx) => (
                   <tr key={item.ID || item.id}>
+                    <td>{(page - 1) * ITEMS_PER_PAGE + idx + 1}</td>
                     <td>{item["NAMA BARANG"] || item.namaBarang}</td>
                     <td style={{ color: Number(item["CURRENT"]) === 0 ? '#b91c1c' : '#92400e', fontWeight: 700, textAlign: 'center' }}>{item["CURRENT"]}</td>
                     <td>
