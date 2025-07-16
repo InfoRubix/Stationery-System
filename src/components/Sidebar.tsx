@@ -17,6 +17,7 @@ const navItemsAdmin = [
   { label: 'Log History', icon: '📜', href: '/admin/log-history' },
   { label: 'Restock & Edit Stock', icon: '🛠️', href: '/admin/restock' },
   { label: 'Add New Stock', icon: '➕', href: '/admin/add-stock' },
+  { label: 'Price Stock', icon: '💰', href: '/admin/price-stock' },
   // Low Stock Alerts link will be added dynamically below
 ];
 

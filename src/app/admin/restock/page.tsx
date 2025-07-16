@@ -6,6 +6,7 @@ import { restockItem } from '@/lib/google-apps-script';
 import React from "react";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { getImageSrc } from "@/lib/getImageSrc";
+import { getPriceStock, editPriceStock, editItem } from "@/lib/google-apps-script";
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -87,8 +88,13 @@ export default function AdminRestockPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState('');
   const [editName, setEditName] = useState('');
-  const [editImage, setEditImage] = useState('');
+  const [editImage, setEditImage] = useState<File | null>(null);
   const [restockQty, setRestockQty] = useState(1);
+  const [editBasePrice, setEditBasePrice] = useState('');
+  const [editTiers, setEditTiers] = useState([
+    { qty: '', price: '' },
+  ]);
+  const [editTypeStock, setEditTypeStock] = useState('');
 
   // Restore last page from localStorage on mount
   useEffect(() => {
@@ -196,7 +202,19 @@ export default function AdminRestockPage() {
     setModalType('edit');
     setModalItem(item);
     setEditName(item["NAMA BARANG"] || '');
-    setEditImage(item["IMAGE"] || '');
+    setEditBasePrice(item["BASE PRICE"] || '');
+    setEditTypeStock(item["TYPE STOCK"] || '');
+    setEditImage(null); // Reset image upload
+    // Load up to 5 tiers from item
+    const tiers = [];
+    for (let i = 1; i <= 5; i++) {
+      const qty = item[`TIER ${i} QTY`] || '';
+      const price = item[`TIER ${i} PRICE`] || '';
+      if (qty || price) {
+        tiers.push({ qty, price });
+      }
+    }
+    setEditTiers(tiers.length ? tiers : [{ qty: '', price: '' }]);
     setModalError('');
   };
   const closeModal = () => {
@@ -236,6 +254,16 @@ export default function AdminRestockPage() {
   };
 
   // API call for edit
+  const handleAddTier = () => {
+    if (editTiers.length < 5) setEditTiers([...editTiers, { qty: '', price: '' }]);
+  };
+  const handleRemoveTier = (idx: number) => {
+    if (editTiers.length > 1) setEditTiers(editTiers.filter((_, i) => i !== idx));
+  };
+  const handleTierChange = (idx: number, field: 'qty' | 'price', value: string) => {
+    setEditTiers(editTiers.map((tier, i) => i === idx ? { ...tier, [field]: value } : tier));
+  };
+
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalItem) return;
@@ -243,28 +271,76 @@ export default function AdminRestockPage() {
       setModalError('Name is required');
       return;
     }
+    if (!editTypeStock) {
+      setModalError('Type Stock is required');
+      return;
+    }
     setModalLoading(true);
     setModalError('');
     try {
-      const res = await fetch('/api/items', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'edit',
-          id: modalItem["ID"],
-          namaBarang: editName,
-          image: editImage
-        })
+      // Prepare fields for editPriceStock
+      const fields: Record<string, any> = {
+        "NAMA BARANG": editName,
+        "BASE PRICE": parseFloat(editBasePrice).toFixed(2),
+        "TYPE STOCK": editTypeStock,
+      };
+      editTiers.forEach((tier, idx) => {
+        fields[`TIER ${idx + 1} QTY`] = tier.qty;
+        fields[`TIER ${idx + 1} PRICE`] = tier.price ? parseFloat(tier.price).toFixed(2) : '';
       });
-      if (!res.ok) throw new Error('Failed to edit item');
+      // Update PRICESTOCK
+      await editPriceStock(modalItem["ID"], fields);
+      // Handle image upload if a new image is selected
+      let imageUrl = undefined;
+      if (editImage) {
+        // Upload image to backend (implement upload logic as in add stock)
+        const reader = new FileReader();
+        const fileData = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(editImage);
+        });
+        const uploadRes = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileData,
+            fileName: editImage.name,
+            mimeType: editImage.type,
+          }),
+        });
+        const uploadJson = await uploadRes.json();
+        if (uploadJson.success && uploadJson.webContentLink) {
+          imageUrl = uploadJson.webContentLink;
+        }
+      }
+      // Update ITEMLOG (only name and image if uploaded, using ID as key)
+      if (imageUrl) {
+        await editItem(modalItem["ID"], editName, imageUrl);
+      } else {
+        await editItem(modalItem["ID"], editName, modalItem["IMAGE"] || "");
+      }
       closeModal();
       fetchItems();
-    } catch (err) {
-      setModalError('Failed to edit item.');
+    } catch (err: any) {
+      setModalError('Failed to update item.');
     } finally {
       setModalLoading(false);
     }
   };
+
+  // Helper to get display price for an item
+  function getDisplayPrice(item: any) {
+    // Try to find the lowest tier price > 0
+    for (let i = 1; i <= 5; i++) {
+      const price = parseFloat(item[`TIER ${i} PRICE`] || '');
+      if (!isNaN(price) && price > 0) return price.toFixed(2);
+    }
+    // Fallback to base price
+    const base = parseFloat(item["BASE PRICE"] || '');
+    if (!isNaN(base) && base > 0) return base.toFixed(2);
+    return null;
+  }
 
   if (loading) return (
     <div className={styles.dashboard}>
@@ -420,6 +496,11 @@ export default function AdminRestockPage() {
                     </div>
                   )}
                   <div style={{ fontWeight: 600, fontSize: 15, textAlign: 'center', marginTop: 4 }}>{item["NAMA BARANG"]}</div>
+                  {getDisplayPrice(item) && (
+                    <div style={{ color: '#059669', fontWeight: 700, fontSize: 15, marginBottom: 4 }}>
+                      Price: RM {getDisplayPrice(item)}
+                    </div>
+                  )}
                   <div style={{ color: '#64748b', fontSize: 13, marginBottom: 4 }}>Current: {item["CURRENT"]}</div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
@@ -533,7 +614,9 @@ export default function AdminRestockPage() {
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
               display: "flex",
               flexDirection: "column",
-              alignItems: "center"
+              alignItems: "center",
+              maxHeight: "80vh",
+              overflowY: "auto",
             }}
           >
             <button
@@ -594,14 +677,114 @@ export default function AdminRestockPage() {
                     />
                   </div>
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ fontWeight: 500 }}>Image Path</label>
+                    <label style={{ fontWeight: 500 }}>Type Stock</label>
+                    <select
+                      className="modal-select"
+                      value={editTypeStock}
+                      onChange={e => setEditTypeStock(e.target.value)}
+                      onFocus={e => {
+                        // Scroll the modal content to the top when select is focused
+                        const modal = e.target.closest('div[role="dialog"]') || e.target.closest('[style*="position: relative"]');
+                        if (modal) modal.scrollTop = 0;
+                      }}
+                      style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', boxSizing: 'border-box' }}
+                      required
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Ream">Ream</option>
+                      <option value="Unit">Unit</option>
+                      <option value="Bottle">Bottle</option>
+                      <option value="Pack">Pack</option>
+                      <option value="Box">Box</option>
+                      <option value="Roll">Roll</option>
+                      <option value="Pcs">Pcs</option>
+                      <option value="Pad">Pad</option>
+                      <option value="gms">gms</option>
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontWeight: 500 }}>Base Price</label>
                     <input
-                      type="text"
-                      value={editImage}
-                      onChange={e => setEditImage(e.target.value)}
+                      type="number"
+                      step="0.01"
+                      value={editBasePrice}
+                      onChange={e => setEditBasePrice(e.target.value)}
                       style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                      required
                     />
                   </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Edit Price Tiers</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {editTiers.map((tier, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{ minWidth: 80, fontWeight: 600 }}>
+                            {`Tier ${idx + 1} Qty`}
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="Qty"
+                            value={tier.qty}
+                            onChange={e => {
+                              const newTiers = [...editTiers];
+                              newTiers[idx].qty = e.target.value;
+                              setEditTiers(newTiers);
+                            }}
+                            style={{ width: 70, padding: 6, borderRadius: 4, border: '1px solid #e5eaf1', fontSize: 15 }}
+                            required
+                          />
+                          <label style={{ minWidth: 50, fontWeight: 600 }}>Price</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            placeholder="Price"
+                            value={tier.price}
+                            onChange={e => {
+                              const newTiers = [...editTiers];
+                              newTiers[idx].price = e.target.value;
+                              setEditTiers(newTiers);
+                            }}
+                            style={{ width: 90, padding: 6, borderRadius: 4, border: '1px solid #e5eaf1', fontSize: 15 }}
+                            required
+                          />
+                          {editTiers.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditTiers(editTiers.filter((_, i) => i !== idx));
+                              }}
+                              style={{ color: '#b91c1c', background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', marginLeft: 4 }}
+                              aria-label={`Remove Tier ${idx + 1}`}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {editTiers.length < 5 && (
+                        <button
+                          type="button"
+                          onClick={() => setEditTiers([...editTiers, { qty: '', price: '' }])}
+                          style={{ color: '#2563eb', background: 'none', border: '1px solid #2563eb', borderRadius: 6, padding: '4px 12px', fontWeight: 600, cursor: 'pointer', marginTop: 4 }}
+                        >
+                          + Add Tier
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {modalType === 'edit' && (
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontWeight: 500 }}>Change Image (optional)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={e => setEditImage(e.target.files?.[0] || null)}
+                        disabled={modalLoading}
+                      />
+                    </div>
+                  )}
                 </>
               )}
               {modalError && <div style={{ color: '#b91c1c', marginBottom: 12 }}>{modalError}</div>}

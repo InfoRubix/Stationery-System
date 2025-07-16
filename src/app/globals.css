@@ -71,6 +71,18 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px #2563eb22;
 }
 
+.modal-select {
+  font-size: 16px;
+  max-width: 350px;
+}
+
+@media (max-width: 600px) {
+  .modal-select {
+    font-size: 13px !important;
+    max-width: 90vw !important;
+  }
+}
+
 @media (max-width: 600px) {
   .order-form-fields {
     flex-direction: column !important;

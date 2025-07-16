@@ -1,7 +1,7 @@
 // Google Apps Script integration for stationery management system
 // This replaces the Google Sheets API with a simpler Apps Script web app approach
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcCOnAk_OF6gXGl-pxY1RlEwuEAUnyE_7sriH3ga8FnYJAv3HlSpu0CNGgxqaJxET5/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxR4zptqLBPt_rJmYWOO1eOzwb16umJcZvJtXUeM06K9P1lurgIRVdqSH4x_0o1Phbz/exec';
 
 // Types for our data
 export interface ItemLog {
@@ -134,26 +134,18 @@ export async function logUsage(
   items: RequestItem[]
 ): Promise<any> {
   try {
+    const formData = new FormData();
+    formData.append('action', 'logUsage');
+    formData.append('email', email);
+    formData.append('department', department);
+    formData.append('items', JSON.stringify(items.map(item => ({ ...item, bilangan: Number(item.bilangan) }))));
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'logUsage',
-        email,
-        department,
-        items: JSON.stringify(items.map(item => ({
-          ...item,
-          bilangan: Number(item.bilangan)
-        })))
-      })
+      body: formData,
     });
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
     const result = await response.json();
     if (result.error) {
       throw new Error(result.error);
@@ -167,29 +159,21 @@ export async function logUsage(
 
 export async function updateLogStatus(request: Request): Promise<any> {
   try {
+    const formData = new FormData();
+    formData.append('action', 'updateLogStatus');
+    formData.append('logId', String(request.id));
+    formData.append('id', String(request.id));
+    formData.append('status', request.status);
+    formData.append('email', request.email);
+    formData.append('department', request.department);
+    formData.append('items', JSON.stringify(request.items.map(item => ({ ...item, bilangan: Number(item.bilangan) }))));
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'updateLogStatus',
-        logId: request.id, // Add logId for compatibility
-        id: request.id,
-        status: request.status,
-        email: request.email,
-        department: request.department,
-        items: JSON.stringify(request.items.map(item => ({
-          ...item,
-          bilangan: Number(item.bilangan)
-        })))
-      })
+      body: formData,
     });
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
     const result = await response.json();
     if (result.error) {
       throw new Error(result.error);
@@ -203,27 +187,21 @@ export async function updateLogStatus(request: Request): Promise<any> {
 
 export async function restockItem(id: string, addQty: number): Promise<void> {
   try {
+    const formData = new FormData();
+    formData.append('action', 'restockItem');
+    formData.append('id', String(id));
+    formData.append('addQty', String(Math.max(0, Number(addQty))));
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'restockItem',
-        id: Number(id), // Convert to number
-        addQty: Math.max(0, Number(addQty)) // Ensure positive number
-      })
+      body: formData,
     });
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
     const result = await response.json();
     if (result.error) {
       throw new Error(result.error);
     }
-    
     console.log('Restock result:', result);
   } catch (error) {
     console.error('restockItem: Error restocking item:', error);
@@ -233,23 +211,18 @@ export async function restockItem(id: string, addQty: number): Promise<void> {
 
 export async function editItem(id: string, namaBarang: string, image: string): Promise<void> {
   try {
+    const formData = new FormData();
+    formData.append('action', 'editItem');
+    formData.append('id', String(id));
+    formData.append('namaBarang', namaBarang);
+    formData.append('image', image);
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'editItem',
-        id: Number(id), // Convert to number
-        namaBarang,
-        image
-      })
+      body: formData,
     });
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
     const result = await response.json();
     if (result.error) {
       throw new Error(result.error);
@@ -276,5 +249,47 @@ export async function getImageUrl(imagePath: string): Promise<string> {
   } catch (error) {
     console.error('Error getting image URL:', error);
     return '';
+  }
+} 
+
+// Get all price stock items from PRICESTOCK sheet
+export async function getPriceStock(): Promise<any[]> {
+  try {
+    const response = await fetch(APPS_SCRIPT_URL + '?action=getPriceStock');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    return result;
+  } catch (error) {
+    console.error('getPriceStock: Error fetching price stock:', error);
+    throw error;
+  }
+}
+
+// Edit a price stock item in PRICESTOCK sheet
+export async function editPriceStock(id: string, fields: Record<string, any>): Promise<void> {
+  try {
+    const formData = new FormData();
+    formData.append('action', 'editPriceStock');
+    formData.append('id', String(id));
+    Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('editPriceStock: Error editing price stock:', error);
+    throw error;
   }
 } 
