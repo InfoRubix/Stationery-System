@@ -1,8 +1,29 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import styles from "../../page.module.css";
 import { getPriceStock, editPriceStock } from "@/lib/google-apps-script";
 import React from "react"; // Added missing import for React
+import { DotLoader } from "@/components/ui/dot-loader";
+
+
+const loaderFrames = [
+  [14, 7, 0, 8, 6, 13, 20],
+  [14, 7, 13, 20, 16, 27, 21],
+  [14, 20, 27, 21, 34, 24, 28],
+  [27, 21, 34, 28, 41, 32, 35],
+  [34, 28, 41, 35, 48, 40, 42],
+  [34, 28, 41, 35, 48, 42, 46],
+  [34, 28, 41, 35, 48, 42, 38],
+  [34, 28, 41, 35, 48, 30, 21],
+  [34, 28, 41, 48, 21, 22, 14],
+  [34, 28, 41, 21, 14, 16, 27],
+  [34, 28, 21, 14, 10, 20, 27],
+  [28, 21, 14, 4, 13, 20, 27],
+  [28, 21, 14, 12, 6, 13, 20],
+  [28, 21, 14, 6, 13, 20, 11],
+  [28, 21, 14, 6, 13, 20, 10],
+  [14, 6, 13, 20, 9, 7, 21],
+];
 
 const ITEMS_PER_PAGE = 10;
 
@@ -18,9 +39,19 @@ export default function PriceStockPage() {
   const [editTypeStock, setEditTypeStock] = useState("");
   const [editBasePrice, setEditBasePrice] = useState("");
   const [editTiers, setEditTiers] = useState<{ qty: string; price: string }[]>([{ qty: "", price: "" }]);
+  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchPriceStock();
+  }, []);
+
+  // Focus the search input on mount
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
   }, []);
 
   const fetchPriceStock = async () => {
@@ -34,6 +65,32 @@ export default function PriceStockPage() {
       setLoading(false);
     }
   };
+
+  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+  };
+
+  const handleSearch = () => {
+    setPage(1); // Reset to first page on new search
+    setSearchQuery(search);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Filter items based on search query
+  const filteredItems = items.filter(item => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      item["NAMA BARANG"]?.toLowerCase().includes(query) ||
+      item["TYPE STOCK"]?.toLowerCase().includes(query) ||
+      item["BASE PRICE"]?.toString().includes(query)
+    );
+  });
 
   const openEditModal = (item: any) => {
     setModalItem(item);
@@ -78,23 +135,52 @@ export default function PriceStockPage() {
 
   const headers = items[0] ? Object.keys(items[0]) : [];
 
-  // Pagination logic
-  const paginatedItems = items.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+  // Pagination logic with filtered items
+  const paginatedItems = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
 
   return (
     <div className={styles.dashboard}>
       <div className={styles.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <h1 className={styles.heading}>Price Stock Management</h1>
+          <div style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
+            Total Items: {filteredItems.length}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 12, margin: '16px 0', flexWrap: 'wrap' }}>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search items..."
+            value={search}
+            onChange={handleSearchInput}
+            onKeyDown={handleSearchKeyDown}
+            className={styles.input}
+            style={{ flex: 1, minWidth: 180 }}
+          />
+          <button
+            className={styles.primaryBtn}
+            type="button"
+            style={{ fontSize: 14, padding: '8px 20px' }}
+            onClick={handleSearch}
+          >
+            Search
+          </button>
         </div>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 120 }}>
-            Loading...
+            <div className="flex items-center gap-5 rounded bg-black px-4 py-3 text-white">
+                      <DotLoader
+                        frames={loaderFrames}
+                        className="gap-0.5"
+                        dotClassName="dot-loader-dot"
+                      />
+                    </div>
           </div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#059669', fontWeight: 600, padding: 32 }}>
-            No price stock data found.
+            {searchQuery ? 'No items found matching your search.' : 'No price stock data found.'}
           </div>
         ) : (
           <>
@@ -160,25 +246,27 @@ export default function PriceStockPage() {
               </tbody>
             </table>
             {/* Pagination controls */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 24, gap: 16 }}>
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                style={{ padding: '6px 18px', borderRadius: 8, background: page === 1 ? '#e5e7eb' : '#2563eb', color: page === 1 ? '#888' : '#fff', border: 'none', fontWeight: 600 }}
-              >
-                Prev
-              </button>
-              <span style={{ fontWeight: 600 }}>
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                style={{ padding: '6px 18px', borderRadius: 8, background: page === totalPages ? '#e5e7eb' : '#2563eb', color: page === totalPages ? '#888' : '#fff', border: 'none', fontWeight: 600 }}
-              >
-                Next
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 24, gap: 16 }}>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  style={{ padding: '6px 18px', borderRadius: 8, background: page === 1 ? '#e5e7eb' : '#2563eb', color: page === 1 ? '#888' : '#fff', border: 'none', fontWeight: 600 }}
+                >
+                  Prev
+                </button>
+                <span style={{ fontWeight: 600 }}>
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  style={{ padding: '6px 18px', borderRadius: 8, background: page === totalPages ? '#e5e7eb' : '#2563eb', color: page === totalPages ? '#888' : '#fff', border: 'none', fontWeight: 600 }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
             {/* Edit Modal */}
             {modalItem && (
               <div
