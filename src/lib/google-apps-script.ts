@@ -1,7 +1,7 @@
 // Google Apps Script integration for stationery management system
 // This replaces the Google Sheets API with a simpler Apps Script web app approach
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxR4zptqLBPt_rJmYWOO1eOzwb16umJcZvJtXUeM06K9P1lurgIRVdqSH4x_0o1Phbz/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwis8xdojLqRv0XRjEm6s0rRuzJ4mKO2SD741SdfxiZsTRlGAaRVmbumn2__OgCALrm/exec';
 
 // Types for our data
 export interface ItemLog {
@@ -21,6 +21,7 @@ export interface ItemLog {
   bilLog10: number;
   total: number;
   current: number;
+  targetStock: number;
 }
 
 export interface LogEntry {
@@ -292,4 +293,22 @@ export async function editPriceStock(id: string, fields: Record<string, any>): P
     console.error('editPriceStock: Error editing price stock:', error);
     throw error;
   }
-} 
+}
+
+// Correct interface for price stock
+export interface PriceStock {
+  id: string;
+  namaBarang: string;
+  basePrice: number;
+  typeStock: string;
+  tier1Qty: number;
+  tier1Price: number;
+  tier2Qty: number;
+  tier2Price: number;
+  tier3Qty: number;
+  tier3Price: number;
+  tier4Qty: number;
+  tier4Price: number;
+  tier5Qty: number;
+  tier5Price: number;
+}

@@ -57,7 +57,8 @@ export default function PriceStockPage() {
   const fetchPriceStock = async () => {
     setLoading(true);
     try {
-      const data = await getPriceStock();
+      const response = await fetch('/api/price-stock');
+      const data = await response.json();
       setItems(data);
     } catch (e) {
       setItems([]);
@@ -108,6 +109,12 @@ export default function PriceStockPage() {
     }
     setEditTiers(tiers.length ? tiers : [{ qty: "", price: "" }]);
     setModalError("");
+    setEditFields({
+      "NAMA BARANG": item["NAMA BARANG"] || "",
+      "TYPE STOCK": item["TYPE STOCK"] || "",
+      "BASE PRICE": item["BASE PRICE"] || "",
+      "TARGET STOCK": item["TARGET STOCK"] || "",
+    });
   };
   const closeModal = () => {
     setModalItem(null);
@@ -123,7 +130,38 @@ export default function PriceStockPage() {
     setModalLoading(true);
     setModalError("");
     try {
-      await editPriceStock(modalItem["ID"], editFields);
+      const formData = new FormData();
+      // Always use the actual ID from the sheet, not the row number
+      formData.append('id', String(modalItem["ID"]));
+      // Append all fields with exact header names
+      formData.append('NAMA BARANG', editName);
+      formData.append('BASE PRICE', editBasePrice);
+      formData.append('TYPE STOCK', editTypeStock);
+      // Append tiers
+      editTiers.forEach((tier, idx) => {
+        formData.append(`TIER ${idx + 1} QTY`, tier.qty);
+        formData.append(`TIER ${idx + 1} PRICE`, tier.price);
+      });
+      // Append target stock if present
+      if (editFields["TARGET STOCK"] !== undefined && editFields["TARGET STOCK"] !== "") {
+        formData.append('TARGET STOCK', editFields["TARGET STOCK"]);
+      }
+      const res = await fetch('/api/price-stock', {
+        method: 'PUT',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Failed to update item');
+      // Also update TARGETSTOCK in ITEMLOG if Target Stock was edited
+      if (editFields["TARGET STOCK"] !== undefined && editFields["TARGET STOCK"] !== "") {
+        const itemlogForm = new FormData();
+        itemlogForm.append('action', 'editItem');
+        itemlogForm.append('id', String(modalItem["ID"]));
+        itemlogForm.append('targetStock', editFields["TARGET STOCK"]);
+        await fetch('/api/items', {
+          method: 'PUT',
+          body: itemlogForm,
+        });
+      }
       closeModal();
       fetchPriceStock();
     } catch (err) {
@@ -217,7 +255,11 @@ export default function PriceStockPage() {
                         <td>{item["BASE PRICE"]}</td>
                         <td>{item["TYPE STOCK"]}</td>
                         <td>{tiers[0]?.qty || ''}</td>
-                        <td>{tiers[0]?.price || ''}</td>
+                        <td>
+                          {tiers[0]?.price !== undefined && tiers[0]?.price !== '' && !isNaN(Number(tiers[0].price))
+                            ? Number(tiers[0].price).toFixed(2)
+                            : ''}
+                        </td>
                         <td>
                           <button
                             className={styles.primaryBtn}
@@ -236,7 +278,11 @@ export default function PriceStockPage() {
                           <td></td>
                           <td></td>
                           <td>{tier.qty}</td>
-                          <td>{tier.price}</td>
+                          <td>
+                            {tier.price !== undefined && tier.price !== '' && !isNaN(Number(tier.price))
+                              ? Number(tier.price).toFixed(2)
+                              : ''}
+                          </td>
                           <td></td>
                         </tr>
                       ))}
@@ -366,6 +412,18 @@ export default function PriceStockPage() {
                         step={0.01}
                         value={editBasePrice}
                         onChange={e => setEditBasePrice(e.target.value)}
+                        style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                        required
+                      />
+                    </div>
+                    {/* Target Stock field */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontWeight: 500 }}>Target Stock</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editFields["TARGET STOCK"] ?? modalItem["TARGET STOCK"] ?? ""}
+                        onChange={e => handleFieldChange("TARGET STOCK", e.target.value)}
                         style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
                         required
                       />

@@ -71,6 +71,26 @@ function ScrollToTopButton() {
   );
 }
 
+// Helper to update item with target stock
+async function editItemWithTargetStock(id: string, namaBarang: string, image: string, targetStock: string) {
+  const formData = new FormData();
+  formData.append('action', 'editItem');
+  formData.append('id', String(id));
+  formData.append('namaBarang', namaBarang);
+  formData.append('image', image);
+  if (targetStock !== undefined && targetStock !== '') {
+    formData.append('targetStock', targetStock);
+  }
+  const response = await fetch('/api/items', {
+    method: 'PUT',
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update item');
+  }
+  return await response.json();
+}
+
 export default function AdminRestockPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +115,8 @@ export default function AdminRestockPage() {
     { qty: '', price: '' },
   ]);
   const [editTypeStock, setEditTypeStock] = useState('');
+  const [editTargetStock, setEditTargetStock] = useState('');
+  const [editTargetStockModal, setEditTargetStockModal] = useState<{ open: boolean, item: any, value: string }>({ open: false, item: null, value: '' });
 
   // Restore last page from localStorage on mount
   useEffect(() => {
@@ -215,6 +237,7 @@ export default function AdminRestockPage() {
       }
     }
     setEditTiers(tiers.length ? tiers : [{ qty: '', price: '' }]);
+    setEditTargetStock(item["TARGET STOCK"] || '');
     setModalError('');
   };
   const closeModal = () => {
@@ -234,14 +257,13 @@ export default function AdminRestockPage() {
     setModalLoading(true);
     setModalError('');
     try {
+      const formData = new FormData();
+      formData.append('action', 'restockItem');
+      formData.append('id', modalItem["ID"]);
+      formData.append('addQty', String(restockQty));
       const res = await fetch('/api/items', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'restock',
-          id: modalItem["ID"],
-          addQty: restockQty
-        })
+        body: formData,
       });
       if (!res.ok) throw new Error('Failed to restock');
       closeModal();
@@ -288,6 +310,10 @@ export default function AdminRestockPage() {
         fields[`TIER ${idx + 1} QTY`] = tier.qty;
         fields[`TIER ${idx + 1} PRICE`] = tier.price ? parseFloat(tier.price).toFixed(2) : '';
       });
+      // Update target stock if present
+      if (editTargetStock !== undefined && editTargetStock !== '') {
+        fields["TARGET STOCK"] = editTargetStock;
+      }
       // Update PRICESTOCK
       await editPriceStock(modalItem["ID"], fields);
       // Handle image upload if a new image is selected
@@ -316,9 +342,9 @@ export default function AdminRestockPage() {
       }
       // Update ITEMLOG (only name and image if uploaded, using ID as key)
       if (imageUrl) {
-        await editItem(modalItem["ID"], editName, imageUrl);
+        await editItemWithTargetStock(modalItem["ID"], editName, imageUrl, editTargetStock);
       } else {
-        await editItem(modalItem["ID"], editName, modalItem["IMAGE"] || "");
+        await editItemWithTargetStock(modalItem["ID"], editName, modalItem["IMAGE"] || "", editTargetStock);
       }
       closeModal();
       fetchItems();
@@ -501,7 +527,35 @@ export default function AdminRestockPage() {
                       Price: RM {getDisplayPrice(item)}
                     </div>
                   )}
-                  <div style={{ color: '#64748b', fontSize: 13, marginBottom: 4 }}>Current: {item["CURRENT"]}</div>
+                  {/* Only show Current Stock, remove Target Stock and related UI */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    marginBottom: 8,
+                    width: '100%',
+                  }}>
+                    <span
+                      title="Current Stock"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: '#e0f7fa',
+                        color: '#059669',
+                        fontWeight: 700,
+                        fontSize: 15,
+                        borderRadius: 16,
+                        padding: '4px 14px',
+                        border: '1px solid #38bdf8',
+                        minWidth: 60,
+                        justifyContent: 'center',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      }}
+                    >
+                      <span style={{ marginRight: 6 }}>Current</span>
+                      {item["CURRENT"]}
+                    </span>
+                  </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
                     <button className={styles.acceptBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openRestockModal(item)}>Restock</button>
@@ -795,6 +849,107 @@ export default function AdminRestockPage() {
                 disabled={modalLoading}
               >
                 {modalLoading ? 'Processing...' : modalType === 'restock' ? 'Restock' : 'Save Changes'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Target Stock Edit Modal */}
+      {editTargetStockModal.open && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px"
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setEditTargetStockModal({ open: false, item: null, value: '' }); }}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: 340,
+              width: "100%",
+              background: "white",
+              borderRadius: "12px",
+              padding: "28px 24px 24px 24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              maxHeight: "60vh",
+              overflowY: "auto",
+            }}
+          >
+            <button
+              onClick={() => setEditTargetStockModal({ open: false, item: null, value: '' })}
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "15px",
+                border: "none",
+                fontSize: "24px",
+                cursor: "pointer",
+                color: "#666",
+                zIndex: 1001,
+                width: "30px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.1)"
+              }}
+              aria-label="Close modal"
+            >
+              ×
+            </button>
+            <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 18, textAlign: 'center' }}>
+              Edit Target Stock
+            </h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editTargetStockModal.item) return;
+                try {
+                  await editItemWithTargetStock(
+                    editTargetStockModal.item["ID"],
+                    editTargetStockModal.item["NAMA BARANG"],
+                    editTargetStockModal.item["IMAGE"] || '',
+                    editTargetStockModal.value
+                  );
+                  setEditTargetStockModal({ open: false, item: null, value: '' });
+                  fetchItems();
+                } catch (err) {
+                  alert('Failed to update target stock.');
+                }
+              }}
+              style={{ width: '100%' }}
+            >
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 500 }}>Target Stock</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editTargetStockModal.value}
+                  onChange={e => setEditTargetStockModal(modal => ({ ...modal, value: e.target.value }))}
+                  style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className={styles.primaryBtn}
+                style={{ width: '100%', fontSize: 16, padding: '10px 0', marginTop: 8 }}
+              >
+                Save
               </button>
             </form>
           </div>

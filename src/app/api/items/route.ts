@@ -69,18 +69,28 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
-    if (body.action === 'restock') {
-      await restockItem(body.id, body.addQty);
+    // Use formData for FormData requests
+    const form = await req.formData();
+    const body = Object.fromEntries(form.entries());
+
+    if (body.action === 'restock' || body.action === 'restockItem') {
+      if (!body.id || typeof body.addQty === 'undefined') {
+        return NextResponse.json({ error: 'Missing id or addQty' }, { status: 400 });
+      }
+      await restockItem(String(body.id), Number(body.addQty));
       return NextResponse.json({ message: 'Restocked successfully' });
-    } else if (body.action === 'edit') {
-      await editItem(body.id, body.namaBarang, body.image);
+    } else if (body.action === 'edit' || body.action === 'editItem') {
+      if (!body.id) {
+        return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+      }
+      // Allow partial updates: pass all fields to editItem
+      await editItem(body);
       return NextResponse.json({ message: 'Edited successfully' });
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in PUT /api/items:', error);
-    return NextResponse.json({ error: 'Failed to update item' }, { status: 500 });
+    return NextResponse.json({ error: error.message || String(error) }, { status: 500 });
   }
 } 
