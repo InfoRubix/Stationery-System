@@ -196,7 +196,7 @@ export default function LowStockPage() {
       // Tier headers
       doc.text('Tier Qty', colPositions[5] + colWidths[5]/2, headerY, { align: 'center' });
       doc.text('Qty', colPositions[6] + colWidths[6]/2, headerY, { align: 'center' });
-      doc.text('Price/Unit', colPositions[7] + colWidths[7]/2, headerY, { align: 'center' });
+      doc.text('Tier Price', colPositions[7] + colWidths[7]/2, headerY, { align: 'center' });
       doc.text('Total Price', colPositions[8] + colWidths[8]/2, headerY, { align: 'center' });
 
       // Draw header borders - both top and bottom borders for complete look
@@ -450,7 +450,7 @@ export default function LowStockPage() {
                   <th colSpan={5}></th>
                   <th style={{ textAlign: 'center' }}>Tier Qty</th>
                   <th style={{ textAlign: 'center' }}>Qty</th>
-                  <th style={{ textAlign: 'center' }}>Price/Unit</th>
+                  <th style={{ textAlign: 'center' }}>Tier Price</th>
                   <th style={{ textAlign: 'center' }}>Total Price</th>
                 </tr>
               </thead>
