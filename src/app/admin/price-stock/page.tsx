@@ -113,7 +113,6 @@ export default function PriceStockPage() {
       "NAMA BARANG": item["NAMA BARANG"] || "",
       "TYPE STOCK": item["TYPE STOCK"] || "",
       "BASE PRICE": item["BASE PRICE"] || "",
-      "TARGET STOCK": item["TARGET STOCK"] || "",
     });
   };
   const closeModal = () => {
@@ -142,26 +141,11 @@ export default function PriceStockPage() {
         formData.append(`TIER ${idx + 1} QTY`, tier.qty);
         formData.append(`TIER ${idx + 1} PRICE`, tier.price);
       });
-      // Append target stock if present
-      if (editFields["TARGET STOCK"] !== undefined && editFields["TARGET STOCK"] !== "") {
-        formData.append('TARGET STOCK', editFields["TARGET STOCK"]);
-      }
       const res = await fetch('/api/price-stock', {
         method: 'PUT',
         body: formData,
       });
       if (!res.ok) throw new Error('Failed to update item');
-      // Also update TARGETSTOCK in ITEMLOG if Target Stock was edited
-      if (editFields["TARGET STOCK"] !== undefined && editFields["TARGET STOCK"] !== "") {
-        const itemlogForm = new FormData();
-        itemlogForm.append('action', 'editItem');
-        itemlogForm.append('id', String(modalItem["ID"]));
-        itemlogForm.append('targetStock', editFields["TARGET STOCK"]);
-        await fetch('/api/items', {
-          method: 'PUT',
-          body: itemlogForm,
-        });
-      }
       closeModal();
       fetchPriceStock();
     } catch (err) {
@@ -412,18 +396,6 @@ export default function PriceStockPage() {
                         step={0.01}
                         value={editBasePrice}
                         onChange={e => setEditBasePrice(e.target.value)}
-                        style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
-                        required
-                      />
-                    </div>
-                    {/* Target Stock field */}
-                    <div style={{ marginBottom: 16 }}>
-                      <label style={{ fontWeight: 500 }}>Target Stock</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={editFields["TARGET STOCK"] ?? modalItem["TARGET STOCK"] ?? ""}
-                        onChange={e => handleFieldChange("TARGET STOCK", e.target.value)}
                         style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
                         required
                       />

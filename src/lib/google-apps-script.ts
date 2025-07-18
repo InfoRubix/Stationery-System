@@ -1,7 +1,7 @@
 // Google Apps Script integration for stationery management system
 // This replaces the Google Sheets API with a simpler Apps Script web app approach
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwis8xdojLqRv0XRjEm6s0rRuzJ4mKO2SD741SdfxiZsTRlGAaRVmbumn2__OgCALrm/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfp3Uv_PMJfyOQrg6lI7cxjfwtbQr0eKc6mQi_jkvDEVAtJay5GTcL4aKoEPFbJhqY/exec';
 
 // Types for our data
 export interface ItemLog {
@@ -210,13 +210,16 @@ export async function restockItem(id: string, addQty: number): Promise<void> {
   }
 }
 
-export async function editItem(id: string, namaBarang: string, image: string): Promise<void> {
+export async function editItem(id: string, namaBarang: string, image: string, targetStock?: string): Promise<void> {
   try {
     const formData = new FormData();
     formData.append('action', 'editItem');
     formData.append('id', String(id));
     formData.append('namaBarang', namaBarang);
     formData.append('image', image);
+    if (targetStock !== undefined && targetStock !== '') {
+      formData.append('targetStock', targetStock);
+    }
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       body: formData,

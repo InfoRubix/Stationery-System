@@ -52,7 +52,7 @@ function calculateTierBreakdown(quantityToBuy: number, priceData: any): Array<{
         tierQty: tier.qty,
         qty: units,
         pricePerUnit: tier.price,
-        totalPrice: units * tier.qty * tier.price,
+        totalPrice: units * tier.price,
       });
       remaining -= units * tier.qty;
     }
