@@ -469,26 +469,8 @@ export default function AdminRestockPage() {
                     marginBottom: 8,
                     width: '100%',
                   }}>
-                    <span
-                      title="Current Stock"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        background: '#e0f7fa',
-                        color: '#059669',
-                        fontWeight: 700,
-                        fontSize: 15,
-                        borderRadius: 16,
-                        padding: '4px 14px',
-                        border: '1px solid #38bdf8',
-                        minWidth: 60,
-                        justifyContent: 'center',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                      }}
-                    >
-                      <span style={{ marginRight: 6 }}>Current</span>
-                      {item["CURRENT"]}
-                    </span>
+                    <span style={{ marginRight: 6 }}>Current: {item["CURRENT"]}</span>  
+                    <span style={{ marginRight: 6 }}>Target Stock: {item["TARGETSTOCK"]}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
