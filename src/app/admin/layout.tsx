@@ -4,6 +4,7 @@ import "../globals.css";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { ExpenseCartProvider } from "@/contexts/ExpenseCartContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // For other admin pages, only render after check
   if (!checked) return null;
   return (
-    <>{children}</>
+    <ExpenseCartProvider>
+      {children}
+    </ExpenseCartProvider>
   );
 } 

@@ -6,7 +6,7 @@ This script adds Google Drive image upload functionality to your existing Google
 
 ```javascript
 // Google Apps Script for Stationery Management System
-// Enhanced with Google Drive image upload functionality
+// Enhanced with Google Drive image upload functionality and expense management
 
 // Configuration
 const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // Replace with your actual spreadsheet ID
@@ -69,6 +69,15 @@ function handleRequest(e) {
       break;
     case 'deleteImage':
       result = deleteImageFromDrive(allParams);
+      break;
+    case 'getExpenseStatus':
+      result = getExpenseStatus();
+      break;
+    case 'addExpenseRequest':
+      result = addExpenseRequest(allParams);
+      break;
+    case 'updateExpenseStatus':
+      result = updateExpenseStatus(allParams);
       break;
     case 'test':
       result = { message: 'Apps Script is working!', timestamp: new Date().toISOString() };
@@ -609,6 +618,159 @@ function listImageFiles() {
     return { success: true, message: 'Image files listed successfully' };
   } catch (error) {
     throw new Error('Error listing image files: ' + error.message);
+  }
+}
+
+// NEW FUNCTIONS: Expense Management
+
+function getExpenseStatus() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EXPENSESTATUS');
+    if (!sheet) {
+      console.log('EXPENSESTATUS sheet not found, returning empty array');
+      return [];
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return []; // Only header row or empty sheet
+    }
+    
+    const headers = data[0];
+    const rows = data.slice(1); // Skip header row
+    
+    return rows.map(row => {
+      const obj = {};
+      for (let i = 0; i < headers.length; i++) {
+        obj[headers[i]] = row[i];
+      }
+      return obj;
+    });
+  } catch (error) {
+    console.error('Error in getExpenseStatus:', error);
+    return [];
+  }
+}
+
+function addExpenseRequest(params) {
+  try {
+    console.log('Adding expense request:', params);
+    
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EXPENSESTATUS');
+    if (!sheet) {
+      throw new Error('EXPENSESTATUS sheet not found');
+    }
+    
+    // Parse the items from the request
+    let items = [];
+    if (typeof params.items === 'string') {
+      items = JSON.parse(params.items);
+    } else if (Array.isArray(params.items)) {
+      items = params.items;
+    }
+    
+    // Generate unique ID
+    const id = new Date().getTime().toString();
+    const datetime = formatMalaysianDateTime(new Date());
+    
+    // Create the expense request row
+    const newRow = [
+      id, // ID
+      datetime, // DATETIME
+      'PENDING', // STATUS
+      params.totalAmount || '0', // TOTAL AMOUNT
+      params.pdfData || '', // PDF DATA
+      JSON.stringify(items) // ITEMS (as JSON string)
+    ];
+    
+    sheet.appendRow(newRow);
+    
+    console.log('Expense request added successfully with ID:', id);
+    
+    return { 
+      success: true, 
+      id: id,
+      message: 'Expense request added successfully' 
+    };
+  } catch (error) {
+    console.error('Error in addExpenseRequest:', error);
+    return { error: error.toString() };
+  }
+}
+
+function updateExpenseStatus(params) {
+  try {
+    console.log('Updating expense status:', params);
+    
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EXPENSESTATUS');
+    if (!sheet) {
+      throw new Error('EXPENSESTATUS sheet not found');
+    }
+    
+    const id = params.id;
+    const status = params.status;
+    
+    if (!id || !status) {
+      throw new Error('ID and status are required');
+    }
+    
+    // Validate status
+    const validStatuses = ['PENDING', 'SUCCESS', 'FAILED'];
+    if (!validStatuses.includes(status)) {
+      throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    
+    // Find the expense request
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      throw new Error('Expense request not found');
+    }
+    
+    // Update the status (Column C - index 2)
+    sheet.getRange(rowIndex, 3).setValue(status);
+    
+    // If status is SUCCESS, move to EXPENSELOG
+    if (status === 'SUCCESS') {
+      const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EXPENSELOG');
+      if (logSheet) {
+        // Get the current row data
+        const currentRow = data[rowIndex - 1];
+        
+        // Add to EXPENSELOG with completion date
+        const logRow = [
+          currentRow[0], // ID
+          currentRow[1], // DATETIME
+          formatMalaysianDateTime(new Date()), // COMPLETION DATE
+          currentRow[3], // TOTAL AMOUNT
+          currentRow[4], // PDF DATA
+          currentRow[5]  // ITEMS
+        ];
+        
+        logSheet.appendRow(logRow);
+        console.log('Expense request moved to EXPENSELOG');
+      }
+    }
+    
+    console.log('Expense status updated successfully');
+    
+    return { 
+      success: true, 
+      id: id,
+      status: status,
+      message: 'Expense status updated successfully' 
+    };
+  } catch (error) {
+    console.error('Error in updateExpenseStatus:', error);
+    return { error: error.toString() };
   }
 }
 ```

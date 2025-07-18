@@ -179,6 +179,24 @@
   position: static;
 }
 
+.cartCheckoutBtn {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: #8b5cf6;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 0.15s;
+}
+
+.cartCheckoutBtn:hover {
+  background: #7c3aed;
+}
+
 .burger {
   display: none;
   position: absolute;

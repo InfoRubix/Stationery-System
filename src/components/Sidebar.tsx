@@ -4,20 +4,31 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import styles from './Sidebar.module.css';
 import { useCart } from '../contexts/CartContext';
+import { useExpenseCart } from '../contexts/ExpenseCartContext';
 import { getItems, ItemLog } from '../lib/google-apps-script';
 import { getImageSrc } from "@/lib/getImageSrc";
 
-const navItemsUser = [
+type NavItem = {
+  label: string;
+  icon: string;
+  href: string;
+  isExpenseCart?: boolean;
+};
+
+const navItemsUser: NavItem[] = [
   { label: 'Order Stationery', icon: '🛒', href: '/' },
   { label: 'List Stock', icon: '📋', href: '/stock' },
   { label: 'Admin', icon: '👤', href: '/admin' },
 ];
-const navItemsAdmin = [
-  { label: 'User Requests', icon: '📥', href: '/admin' },
+const navItemsAdmin: NavItem[] = [
+  { label: 'Dashboard', icon: '📊', href: '/admin' },
+  { label: 'User Requests', icon: '📥', href: '/admin/user-requests' },
   { label: 'Log History', icon: '📜', href: '/admin/log-history' },
   { label: 'Restock & Edit Stock', icon: '🛠️', href: '/admin/restock' },
   { label: 'Add New Stock', icon: '➕', href: '/admin/add-stock' },
   { label: 'Price Stock', icon: '💰', href: '/admin/price-stock' },
+  { label: 'Expense Status', icon: '📊', href: '/admin/expense-status' },
+  { label: 'Expense Cart', icon: '💰', href: '/admin/expense-cart', isExpenseCart: true },
   // Low Stock Alerts link will be added dynamically below
 ];
 
@@ -28,6 +39,27 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
   const setSidebarOpen = setSidebarOpenProp || setLocalSidebarOpen;
   const navItems = role === 'admin' ? navItemsAdmin : navItemsUser;
   const { cartItems, removeFromCart, updateQuantity, getCartTotal } = useCart();
+  
+  // Only use expense cart for admin role
+  let expenseCart = null;
+  let expenseCartItems: any[] = [];
+  let removeFromExpenseCart = (index: number) => {};
+  let updateExpenseItem = (index: number, item: any) => {};
+  let getExpenseCartTotal = () => 0;
+  
+  if (role === 'admin') {
+    try {
+      expenseCart = useExpenseCart();
+      expenseCartItems = expenseCart?.cartItems || [];
+      removeFromExpenseCart = expenseCart?.removeFromCart || ((index: number) => {});
+      updateExpenseItem = expenseCart?.updateItem || ((index: number, item: any) => {});
+      getExpenseCartTotal = expenseCart?.getCartTotal || (() => 0);
+    } catch (error) {
+      // If ExpenseCartProvider is not available, use default values
+      console.warn('ExpenseCartProvider not available');
+    }
+  }
+  
   // Low stock state for admin
   const [lowStockItems, setLowStockItems] = useState<ItemLog[]>([]);
   useEffect(() => {
@@ -83,9 +115,29 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
               onClick={() => setSidebarOpen && setSidebarOpen(false)}
             >
               <Link href={item.href} className={styles.navLink}>
-                <div suppressHydrationWarning>
+                <div suppressHydrationWarning style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
                   <span className={styles.icon}>{item.icon}</span>
                   {item.label}
+                  {/* Show badge for Expense Cart if items > 0 */}
+                  {item.isExpenseCart && expenseCartItems.length > 0 && (
+                    <span style={{
+                      marginLeft: 8,
+                      background: '#8b5cf6',
+                      color: '#fff',
+                      borderRadius: '50%',
+                      width: 22,
+                      height: 22,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      position: 'absolute',
+                      right: -28,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                    }}>{expenseCartItems.length}</span>
+                  )}
                 </div>
               </Link>
             </li>
@@ -188,6 +240,10 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
             )}
           </div>
         )}
+        
+        {/* Expense Cart Button for admin (no detailed section) */}
+        {/* The Expense Cart button is now part of navItemsAdmin, so it's handled by the map above. */}
+        
         {/* Logout button for admin, inside sidebar */}
         {role === 'admin' && (
           <button

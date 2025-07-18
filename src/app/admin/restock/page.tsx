@@ -7,6 +7,8 @@ import React from "react";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { getImageSrc } from "@/lib/getImageSrc";
 import { editItem } from "@/lib/google-apps-script";
+import { useExpenseCart } from "@/contexts/ExpenseCartContext";
+import { getPriceStock } from '@/lib/google-apps-script';
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -72,6 +74,7 @@ function ScrollToTopButton() {
 }
 
 export default function AdminRestockPage() {
+  const { addToCart } = useExpenseCart();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -92,6 +95,10 @@ export default function AdminRestockPage() {
   const [restockQty, setRestockQty] = useState(1);
   const [editTargetStock, setEditTargetStock] = useState('');
   const [editTargetStockModal, setEditTargetStockModal] = useState<{ open: boolean, item: any, value: string }>({ open: false, item: null, value: '' });
+  const [expenseCartModal, setExpenseCartModal] = useState<{ open: boolean, item: any }>({ open: false, item: null });
+  const [expenseQty, setExpenseQty] = useState(1);
+  const [expenseTier, setExpenseTier] = useState('');
+  const [priceStockList, setPriceStockList] = useState<any[]>([]);
 
   // Restore last page from localStorage on mount
   useEffect(() => {
@@ -120,6 +127,11 @@ export default function AdminRestockPage() {
   useEffect(() => {
     fetchItems();
   }, [page, searchQuery]);
+
+  // Fetch PRICESTOCK on mount
+  useEffect(() => {
+    getPriceStock().then(setPriceStockList).catch(() => setPriceStockList([]));
+  }, []);
 
   const fetchItems = async () => {
     try {
@@ -203,10 +215,20 @@ export default function AdminRestockPage() {
     setEditTargetStock(item["TARGET STOCK"] || '');
     setModalError('');
   };
+  const openExpenseCartModal = (item: any) => {
+    setExpenseCartModal({ open: true, item });
+    setExpenseQty(1);
+    setExpenseTier('');
+  };
   const closeModal = () => {
     setModalType(null);
     setModalItem(null);
     setModalError('');
+  };
+  const closeExpenseCartModal = () => {
+    setExpenseCartModal({ open: false, item: null });
+    setExpenseQty(1);
+    setExpenseTier('');
   };
 
   // API call for restock
@@ -275,10 +297,11 @@ export default function AdminRestockPage() {
       }
       // Update ITEMLOG using the library function
       await editItem(
-        modalItem["ID"], 
-        editName, 
-        imageUrl || modalItem["IMAGE"] || "", 
-        editTargetStock
+        modalItem["ID"],
+        editName,
+        imageUrl || modalItem["IMAGE"] || "",
+        editTargetStock,
+        modalItem["NAMA BARANG"] // oldName
       );
       closeModal();
       fetchItems();
@@ -287,6 +310,63 @@ export default function AdminRestockPage() {
     } finally {
       setModalLoading(false);
     }
+  };
+
+  // Expense Cart Modal Tier Options
+  function getTierOptions(item: any) {
+    const priceStockItem = priceStockList.find(
+      (row) => row['NAMA BARANG'] === item['NAMA BARANG']
+    );
+    if (!priceStockItem) return [];
+    const options = [];
+    for (let i = 1; i <= 5; i++) {
+      const qty = priceStockItem[`TIER ${i} QTY`];
+      const price = priceStockItem[`TIER ${i} PRICE`];
+      if (qty && price && parseFloat(price) > 0) {
+        options.push({
+          label: `Tier ${i} - Qty: ${qty}, Price: RM ${parseFloat(price).toFixed(2)}`,
+          value: `Tier ${i}`,
+          price: parseFloat(price),
+          qty: qty
+        });
+      }
+    }
+    return options;
+  }
+
+  const handleAddToExpenseCart = () => {
+    if (!expenseCartModal.item) return;
+    const item = expenseCartModal.item;
+    let selectedPrice = 0;
+    let selectedTier = '';
+    // Find the price based on selected tier from PRICESTOCK
+    const priceStockItem = priceStockList.find(
+      (row) => row['NAMA BARANG'] === item['NAMA BARANG']
+    );
+    if (expenseTier && priceStockItem) {
+      const tierNum = parseInt(expenseTier.split(' ')[1]);
+      selectedPrice = parseFloat(priceStockItem[`TIER ${tierNum} PRICE`] || '0');
+      selectedTier = expenseTier;
+    } else if (priceStockItem) {
+      // Use base price if no tier selected
+      selectedPrice = parseFloat(priceStockItem['BASE PRICE'] || '0');
+      selectedTier = 'Base Price';
+    }
+    if (selectedPrice <= 0) {
+      alert('Please select a valid tier with price');
+      return;
+    }
+    const expenseItem = {
+      id: item['ID'],
+      namaBarang: item['NAMA BARANG'],
+      tier: selectedTier,
+      qty: expenseQty,
+      price: selectedPrice,
+      image: item['IMAGE'] || ''
+    };
+    addToCart(expenseItem);
+    closeExpenseCartModal();
+    alert('Item added to expense cart!');
   };
 
   // Helper to get display price for an item
@@ -475,6 +555,13 @@ export default function AdminRestockPage() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
                     <button className={styles.acceptBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openRestockModal(item)}>Restock</button>
+                    <button 
+                      className={styles.primaryBtn} 
+                      style={{ fontSize: 12, padding: '4px 14px', background: '#8b5cf6', border: '1px solid #8b5cf6' }} 
+                      onClick={() => openExpenseCartModal(item)}
+                    >
+                      Add to Cart
+                    </button>
                   </div>
                 </div>
               </div>
@@ -750,7 +837,8 @@ export default function AdminRestockPage() {
                     editTargetStockModal.item["ID"],
                     editTargetStockModal.item["NAMA BARANG"],
                     editTargetStockModal.item["IMAGE"] || '',
-                    editTargetStockModal.value
+                    editTargetStockModal.value,
+                    editTargetStockModal.item["NAMA BARANG"] // oldName
                   );
                   setEditTargetStockModal({ open: false, item: null, value: '' });
                   fetchItems();
@@ -779,6 +867,111 @@ export default function AdminRestockPage() {
                 Save
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Expense Cart Modal */}
+      {expenseCartModal.open && expenseCartModal.item && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px"
+          }}
+          onClick={e => { if (e.target === e.currentTarget) closeExpenseCartModal(); }}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: 400,
+              width: "100%",
+              background: "white",
+              borderRadius: "12px",
+              padding: "28px 24px 24px 24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+          >
+            <button
+              onClick={closeExpenseCartModal}
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "15px",
+                border: "none",
+                fontSize: "24px",
+                cursor: "pointer",
+                color: "#666",
+                zIndex: 1001,
+                width: "30px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.1)"
+              }}
+              aria-label="Close modal"
+            >
+              ×
+            </button>
+            <h2 style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>
+              Add to Expense Cart
+            </h2>
+            <div style={{ width: '100%' }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 500 }}>Item Name</label>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{expenseCartModal.item["NAMA BARANG"]}</div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 500 }}>Select Tier</label>
+                <select
+                  value={expenseTier}
+                  onChange={e => setExpenseTier(e.target.value)}
+                  style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                >
+                  <option value="">Base Price (RM {(() => {
+                    const priceStockItem = priceStockList.find(
+                      (row) => row['NAMA BARANG'] === expenseCartModal.item['NAMA BARANG']
+                    );
+                    return priceStockItem ? priceStockItem['BASE PRICE'] : '0';
+                  })()})</option>
+                  {getTierOptions(expenseCartModal.item).map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 500 }}>Quantity</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={expenseQty}
+                  onChange={e => setExpenseQty(Number(e.target.value))}
+                  style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                  required
+                />
+              </div>
+              <button
+                onClick={handleAddToExpenseCart}
+                className={styles.primaryBtn}
+                style={{ width: '100%', fontSize: 16, padding: '10px 0', marginTop: 8, background: '#8b5cf6', border: '1px solid #8b5cf6' }}
+              >
+                Add to Cart
+              </button>
+            </div>
           </div>
         </div>
       )}
