@@ -41,8 +41,9 @@ export default function ExpenseCartPage() {
     const rowHeight = 25;
     const headerY = 140;
     const tableLeftX = 40;
-    const tableRightX = 550;
-    const colWidths = [30, 200, 80, 80, 80, 80]; // No, Item Name, Tier, Qty, Price, Total
+    const tableRightX = 550; // Increased to make table wider and better proportioned
+    // Adjusted column widths: better proportions for readability
+    const colWidths = [30, 160, 70, 60, 70, 110]; // No, Item Name, Tier, Qty, Price, Total (wider)
 
     // Helper for date formatting
     const now = new Date();
@@ -77,135 +78,156 @@ export default function ExpenseCartPage() {
       currentX += colWidths[i];
     }
 
-    // Draw header
-    doc.setFillColor(243, 244, 246);
-    doc.rect(tableLeftX, headerY - 15, tableRightX - tableLeftX, rowHeight + 10, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    
-    doc.text('No.', colPositions[0] + 5, headerY);
-    doc.text('Item Name', colPositions[1] + 5, headerY);
-    doc.text('Tier', colPositions[2] + colWidths[2]/2, headerY, { align: 'center' });
-    doc.text('Qty', colPositions[3] + colWidths[3]/2, headerY, { align: 'center' });
-    doc.text('Price', colPositions[4] + colWidths[4]/2, headerY, { align: 'center' });
-    doc.text('Total', colPositions[5] + colWidths[5]/2, headerY, { align: 'center' });
-
-    // Draw header borders
-    doc.setLineWidth(1);
-    doc.line(tableLeftX, headerY - 15, tableRightX, headerY - 15);
-    doc.line(tableLeftX, headerY + 10, tableRightX, headerY + 10);
-
-    // Draw header vertical lines
-    colPositions.forEach(x => {
-      doc.line(x, headerY - 15, x, headerY + 10);
-    });
-    doc.line(tableRightX, headerY - 15, tableRightX, headerY + 10);
-
-    // Draw rows
-    let y = headerY + rowHeight + 5;
+    // Table drawing logic
+    let itemIndex = 0;
     let currentPage = 1;
-    let rowsOnPage = 0;
-
-    for (let i = 0; i < cartItems.length; i++) {
-      const item = cartItems[i];
+    
+    while (itemIndex < cartItems.length) {
+      // Draw header for this page
+      doc.setFillColor(243, 244, 246);
+      doc.rect(tableLeftX, headerY - 15, tableRightX - tableLeftX, rowHeight + 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
       
-      // Check if we need a new page
-      if (rowsOnPage >= 20) {
+      // Main headers
+      doc.text('No.', colPositions[0] + 5, headerY);
+      doc.text('Item Name', colPositions[1] + 5, headerY);
+      doc.text('Tier', colPositions[2] + colWidths[2]/2, headerY, { align: 'center' });
+      doc.text('Qty', colPositions[3] + colWidths[3]/2, headerY, { align: 'center' });
+      doc.text('Price', colPositions[4] + colWidths[4]/2, headerY, { align: 'center' });
+      doc.text('Total', colPositions[5] + colWidths[5]/2, headerY, { align: 'center' });
+
+      // Draw header borders - both top and bottom borders for complete look
+      doc.setLineWidth(1);
+      doc.line(tableLeftX, headerY - 15, tableRightX, headerY - 15); // top border
+      doc.line(tableLeftX, headerY + 10, tableRightX, headerY + 10); // bottom border
+
+      // Draw header vertical lines
+      colPositions.forEach(x => {
+        doc.line(x, headerY - 15, x, headerY + 10);
+      });
+      doc.line(tableRightX, headerY - 15, tableRightX, headerY + 10);
+
+      // Draw rows
+      let y = headerY + rowHeight + 5;
+      let rowsOnPage = 0;
+      let pageRowStartY = headerY - 15;
+      let pageRowEndY = headerY + 10;
+
+      while (itemIndex < cartItems.length && rowsOnPage < 23) {
+        const item = cartItems[itemIndex];
+        if (!item) {
+          itemIndex++;
+          continue; // Skip invalid items
+        }
+        
+        // Calculate required height for this item (including text wrapping)
+        const itemNameForHeight = safeText(item.namaBarang);
+        const maxWidthForHeight = colWidths[1] - 10;
+        let requiredHeight = rowHeight;
+        if (doc.getTextWidth(itemNameForHeight) > maxWidthForHeight) {
+          const words = itemNameForHeight.split(' ');
+          let currentLine = '';
+          let lines = 1;
+          for (let word of words) {
+            const testLine = currentLine + (currentLine ? ' ' : '') + word;
+            if (doc.getTextWidth(testLine) <= maxWidthForHeight) {
+              currentLine = testLine;
+            } else {
+              if (currentLine) lines++;
+              currentLine = word;
+            }
+          }
+          requiredHeight = Math.max(rowHeight, lines * 8 + 15); // 8pt per line + padding
+        }
+        
+        // Check if we have enough space for this item
+        if (rowsOnPage >= 20) {
+          break; // Move to next page
+        }
+
+        // Draw main item row
+        if (rowsOnPage % 2 === 1) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(tableLeftX, y - rowHeight + 10, tableRightX - tableLeftX, requiredHeight, 'F');
+        }
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        
+        // Main item data with safe text conversion
+        doc.text(safeText(itemIndex + 1), colPositions[0] + 5, y);
+        
+        // Handle long item names with text wrapping
+        const itemName = safeText(item.namaBarang);
+        const maxWidth = colWidths[1] - 10; // Leave 5pt padding on each side
+        if (doc.getTextWidth(itemName) > maxWidth) {
+          // Split text into multiple lines
+          const words = itemName.split(' ');
+          let currentLine = '';
+          let lines = [];
+          for (let word of words) {
+            const testLine = currentLine + (currentLine ? ' ' : '') + word;
+            if (doc.getTextWidth(testLine) <= maxWidth) {
+              currentLine = testLine;
+            } else {
+              if (currentLine) lines.push(currentLine);
+              currentLine = word;
+            }
+          }
+          if (currentLine) lines.push(currentLine);
+          
+          // Draw first line
+          doc.text(lines[0], colPositions[1] + 5, y);
+          // Draw additional lines if needed
+          for (let i = 1; i < lines.length; i++) {
+            doc.text(lines[i], colPositions[1] + 5, y + (i * 8));
+          }
+        } else {
+          doc.text(itemName, colPositions[1] + 5, y);
+        }
+        
+        // Centered columns
+        doc.text(safeText(item.tier), colPositions[2] + colWidths[2]/2, y, { align: 'center' });
+        doc.text(safeText(item.qty), colPositions[3] + colWidths[3]/2, y, { align: 'center' });
+        doc.text(`RM${item.price.toFixed(2)}`, colPositions[4] + colWidths[4]/2, y, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`RM${(item.qty * item.price).toFixed(2)}`, colPositions[5] + colWidths[5]/2, y, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+
+        // Draw top border for the main item row
+        doc.setLineWidth(1);
+        doc.line(tableLeftX, y - rowHeight + 10, tableRightX, y - rowHeight + 10);
+        y += requiredHeight;
+        rowsOnPage++;
+
+        // Update page row end position
+        pageRowEndY = y + 10;
+
+        itemIndex++;
+      }
+
+      // Draw bottom border for the last row
+      if (pageRowEndY > headerY + 10) {
+        doc.setLineWidth(1);
+        doc.line(tableLeftX, pageRowEndY, tableRightX, pageRowEndY);
+      }
+
+      // Draw vertical lines for this page
+      colPositions.forEach(x => {
+        doc.line(x, pageRowStartY, x, pageRowEndY);
+      });
+      doc.line(tableRightX, pageRowStartY, tableRightX, pageRowEndY);
+
+      // Add page number at bottom right of the page
+      doc.setFontSize(10);
+      doc.text(`Page ${currentPage}`, tableRightX - 60, pageHeight - 20);
+
+      if (itemIndex < cartItems.length) {
         doc.addPage();
         currentPage++;
-        y = headerY + rowHeight + 5;
-        rowsOnPage = 0;
-        
-        // Redraw header for new page
-        doc.setFillColor(243, 244, 246);
-        doc.rect(tableLeftX, headerY - 15, tableRightX - tableLeftX, rowHeight + 10, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        
-        doc.text('No.', colPositions[0] + 5, headerY);
-        doc.text('Item Name', colPositions[1] + 5, headerY);
-        doc.text('Tier', colPositions[2] + colWidths[2]/2, headerY, { align: 'center' });
-        doc.text('Qty', colPositions[3] + colWidths[3]/2, headerY, { align: 'center' });
-        doc.text('Price', colPositions[4] + colWidths[4]/2, headerY, { align: 'center' });
-        doc.text('Total', colPositions[5] + colWidths[5]/2, headerY, { align: 'center' });
-
-        // Redraw header borders
-        doc.setLineWidth(1);
-        doc.line(tableLeftX, headerY - 15, tableRightX, headerY - 15);
-        doc.line(tableLeftX, headerY + 10, tableRightX, headerY + 10);
-        colPositions.forEach(x => {
-          doc.line(x, headerY - 15, x, headerY + 10);
-        });
-        doc.line(tableRightX, headerY - 15, tableRightX, headerY + 10);
       }
-
-      // Alternate row colors
-      if (rowsOnPage % 2 === 1) {
-        doc.setFillColor(249, 250, 251);
-        doc.rect(tableLeftX, y - rowHeight + 10, tableRightX - tableLeftX, rowHeight, 'F');
-      }
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      
-      // Item data
-      doc.text(safeText(i + 1), colPositions[0] + 5, y);
-      
-      // Handle long item names with text wrapping
-      const itemName = safeText(item.namaBarang);
-      const maxWidth = colWidths[1] - 10;
-      if (doc.getTextWidth(itemName) > maxWidth) {
-        const words = itemName.split(' ');
-        let currentLine = '';
-        let lines = [];
-        for (let word of words) {
-          const testLine = currentLine + (currentLine ? ' ' : '') + word;
-          if (doc.getTextWidth(testLine) <= maxWidth) {
-            currentLine = testLine;
-          } else {
-            if (currentLine) lines.push(currentLine);
-            currentLine = word;
-          }
-        }
-        if (currentLine) lines.push(currentLine);
-        
-        doc.text(lines[0], colPositions[1] + 5, y);
-        for (let j = 1; j < lines.length; j++) {
-          doc.text(lines[j], colPositions[1] + 5, y + (j * 8));
-        }
-      } else {
-        doc.text(itemName, colPositions[1] + 5, y);
-      }
-      
-      doc.text(safeText(item.tier), colPositions[2] + colWidths[2]/2, y, { align: 'center' });
-      doc.text(safeText(item.qty), colPositions[3] + colWidths[3]/2, y, { align: 'center' });
-      doc.text(`RM${item.price.toFixed(2)}`, colPositions[4] + colWidths[4]/2, y, { align: 'center' });
-      doc.setFont('helvetica', 'bold');
-      doc.text(`RM${(item.qty * item.price).toFixed(2)}`, colPositions[5] + colWidths[5]/2, y, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-
-      // Draw row borders
-      doc.setLineWidth(1);
-      doc.line(tableLeftX, y - rowHeight + 10, tableRightX, y - rowHeight + 10);
-      doc.line(tableLeftX, y + 10, tableRightX, y + 10);
-
-      y += rowHeight;
-      rowsOnPage++;
     }
-
-    // Draw final bottom border
-    doc.setLineWidth(1);
-    doc.line(tableLeftX, y + 10, tableRightX, y + 10);
-
-    // Draw vertical lines
-    colPositions.forEach(x => {
-      doc.line(x, headerY - 15, x, y + 10);
-    });
-    doc.line(tableRightX, headerY - 15, tableRightX, y + 10);
-
-    // Add page number
-    doc.setFontSize(10);
-    doc.text(`Page ${currentPage}`, tableRightX - 60, pageHeight - 20);
 
     return doc;
   };
@@ -284,7 +306,36 @@ export default function ExpenseCartPage() {
 
   return (
     <div className={styles.dashboard}>
-      <div className={styles.card}>
+      <div className={styles.card} style={{ position: 'relative' }}>
+        {loading && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(255, 255, 255, 0.9)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+            borderRadius: 12
+          }}>
+            <DotLoader
+              frames={loaderFrames}
+              className="gap-0.5"
+              dotClassName="dot-loader-dot"
+            />
+            <div style={{ marginTop: 16, fontSize: 16, fontWeight: 600, color: '#374151' }}>
+              Processing Purchase...
+            </div>
+            <div style={{ marginTop: 8, fontSize: 14, color: '#6b7280' }}>
+              Generating PDF and saving to database
+            </div>
+          </div>
+        )}
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h1 className={styles.heading}>Expense Cart</h1>
           <div style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
@@ -378,14 +429,16 @@ export default function ExpenseCartPage() {
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button
             onClick={clearCart}
+            disabled={loading}
             style={{ 
               padding: '12px 24px', 
               background: '#6b7280', 
               color: '#fff', 
               border: 'none', 
               borderRadius: 8, 
-              cursor: 'pointer',
-              fontWeight: 600
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              opacity: loading ? 0.6 : 1
             }}
           >
             Clear Cart
@@ -399,21 +452,11 @@ export default function ExpenseCartPage() {
               fontSize: 16, 
               fontWeight: 600,
               background: '#8b5cf6',
-              border: '1px solid #8b5cf6'
+              border: '1px solid #8b5cf6',
+              opacity: loading ? 0.6 : 1
             }}
           >
-            {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <DotLoader
-                  frames={loaderFrames}
-                  className="gap-0.5"
-                  dotClassName="dot-loader-dot"
-                />
-                Processing...
-              </div>
-            ) : (
-              'Confirm Purchase'
-            )}
+            Confirm Purchase
           </button>
         </div>
       </div>

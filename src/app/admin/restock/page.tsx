@@ -99,6 +99,7 @@ export default function AdminRestockPage() {
   const [expenseQty, setExpenseQty] = useState(1);
   const [expenseTier, setExpenseTier] = useState('');
   const [priceStockList, setPriceStockList] = useState<any[]>([]);
+  const [notification, setNotification] = useState('');
 
   // Restore last page from localStorage on mount
   useEffect(() => {
@@ -366,7 +367,8 @@ export default function AdminRestockPage() {
     };
     addToCart(expenseItem);
     closeExpenseCartModal();
-    alert('Item added to expense cart!');
+    setNotification('Item added to expense cart!');
+    setTimeout(() => setNotification(''), 2500);
   };
 
   // Helper to get display price for an item
@@ -403,6 +405,24 @@ export default function AdminRestockPage() {
 
   return (
     <div className={styles.dashboard}>
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          top: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#2563eb',
+          color: '#fff',
+          padding: '12px 32px',
+          borderRadius: 8,
+          fontWeight: 600,
+          fontSize: 16,
+          zIndex: 2000,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+        }}>
+          {notification}
+        </div>
+      )}
       <div className={styles.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className={styles.heading}>Restock & Edit Stock</h1>

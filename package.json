@@ -13,12 +13,14 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.2.0",
     "@mui/material": "^7.2.0",
+    "chart.js": "^4.5.0",
     "formidable": "^3.5.4",
     "googleapis": "^150.0.1",
     "jspdf": "^3.0.1",
     "next": "15.3.5",
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
+    "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
