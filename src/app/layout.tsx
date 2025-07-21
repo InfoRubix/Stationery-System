@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./ClientLayout";
+import { ExpenseCartProvider } from "@/contexts/ExpenseCartContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +28,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}
         style={{ margin: 0 }} suppressHydrationWarning>
-        <ClientLayout>{children}</ClientLayout>
+        <ExpenseCartProvider>
+          <ClientLayout>{children}</ClientLayout>
+        </ExpenseCartProvider>
       </body>
     </html>
   );

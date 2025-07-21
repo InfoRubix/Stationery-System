@@ -207,14 +207,14 @@ export default function HomePage() {
                 Select Department
               </option>
               <option value="MARKETING">MARKETING</option>
-              <option value="CREATIVE DEPARTMENT">CREATIVE DEPARTMENT</option>
+              <option value="RUBIX">RUBIX</option>
+              <option value="CONVEY">CONVEY</option>
               <option value="ACCOUNT">ACCOUNT</option>
               <option value="HR">HR</option>
               <option value="LITIGATION">LITIGATION</option>
-              <option value="SPA">SPA</option>
-              <option value="LOAN">LOAN</option>
+              <option value="SANCO">SANCO</option>
+              <option value="POT/POC">POT/POC</option>
               <option value="AFC">AFC</option>
-              <option value="RUBIX">RUBIX</option>
             </select>
           </div>
           <div style={{ marginBottom: 16 }}>

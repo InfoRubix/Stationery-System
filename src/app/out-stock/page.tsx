@@ -117,7 +117,7 @@ export default function StockPage() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(ITEMS_PER_PAGE),
-        inStock: 'true',
+        outOfStock: 'true',
       });
       if (searchQuery.trim() !== "") {
         params.append("search", searchQuery);
@@ -323,7 +323,7 @@ export default function StockPage() {
       </div>
         
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "24px" }}>
-          {items.filter(item => Number(item["CURRENT"]) > 0).map(item => {
+          {items.filter(item => Number(item["CURRENT"]) === 0).map(item => {
             const itemName = item["NAMA BARANG"];
             const imagePath = item["IMAGE"]; // Use the IMAGE column from Google Sheets
             const imageSrc = getImageSrc(imagePath);

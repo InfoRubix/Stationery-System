@@ -13,23 +13,41 @@ type NavItem = {
   icon: string;
   href: string;
   isExpenseCart?: boolean;
+  isLowStock?: boolean;
 };
 
 const navItemsUser: NavItem[] = [
   { label: 'Order Stationery', icon: '🛒', href: '/' },
   { label: 'List Stock', icon: '📋', href: '/stock' },
-  { label: 'Admin', icon: '👤', href: '/admin' },
+  { label: 'List Out of Stock', icon: '🔴', href: '/out-stock' },
+  { label: 'Admin', icon: '👤 ', href: '/admin' },
 ];
-const navItemsAdmin: NavItem[] = [
-  { label: 'Dashboard', icon: '📊', href: '/admin' },
-  { label: 'User Requests', icon: '📥', href: '/admin/user-requests' },
-  { label: 'Log History', icon: '📜', href: '/admin/log-history' },
-  { label: 'Restock & Edit Stock', icon: '🛠️', href: '/admin/restock' },
-  { label: 'Add New Stock', icon: '➕', href: '/admin/add-stock' },
-  { label: 'Price Stock', icon: '💰', href: '/admin/price-stock' },
-  { label: 'Expense Status', icon: '📊', href: '/admin/expense-status' },
-  { label: 'Expense Cart', icon: '💰', href: '/admin/expense-cart', isExpenseCart: true },
-  // Low Stock Alerts link will be added dynamically below
+// Replace navItemsAdmin with navSectionsAdmin for grouped sections
+const navSectionsAdmin = [
+  {
+    header: "Analytic & Oversight",
+    items: [
+      { label: 'Dashboard', icon: '📊', href: '/admin' },
+      { label: 'User Requests', icon: '📥', href: '/admin/user-requests' },
+      { label: 'Log History', icon: '📜', href: '/admin/log-history' },
+    ] as NavItem[]
+  },
+  {
+    header: "Inventory Management",
+    items: [
+      { label: 'Restock & Edit', icon: '🛠️', href: '/admin/restock' },
+      { label: 'Add New Stock', icon: '➕', href: '/admin/add-stock' },
+      { label: 'Low Stock Alerts', icon: '⚠️', href: '/admin/low-stock', isLowStock: true },
+      { label: 'Price Stock', icon: '💰', href: '/admin/price-stock' },
+    ] as NavItem[]
+  },
+  {
+    header: "Financial & Expense",
+    items: [
+      { label: 'Expense Status', icon: '📊', href: '/admin/expense-status' },
+      { label: 'Expense Cart', icon: '💰', href: '/admin/expense-cart', isExpenseCart: true },
+    ] as NavItem[]
+  }
 ];
 
 export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: setSidebarOpenProp, role }: { sidebarOpen?: boolean, setSidebarOpen?: (open: boolean) => void, role?: 'admin' | 'user' }) {
@@ -37,27 +55,20 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
   const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
   const sidebarOpen = sidebarOpenProp !== undefined ? sidebarOpenProp : localSidebarOpen;
   const setSidebarOpen = setSidebarOpenProp || setLocalSidebarOpen;
-  const navItems = role === 'admin' ? navItemsAdmin : navItemsUser;
+  const navItems = role === 'admin' ? navSectionsAdmin : navItemsUser;
   const { cartItems, removeFromCart, updateQuantity, getCartTotal } = useCart();
-  
-  // Only use expense cart for admin role
-  let expenseCart = null;
+  // Always call useExpenseCart at the top level to follow Rules of Hooks
+  const expenseCart = useExpenseCart();
+  // Only use expense cart values for admin
   let expenseCartItems: any[] = [];
   let removeFromExpenseCart = (index: number) => {};
   let updateExpenseItem = (index: number, item: any) => {};
   let getExpenseCartTotal = () => 0;
-  
-  if (role === 'admin') {
-    try {
-      expenseCart = useExpenseCart();
-      expenseCartItems = expenseCart?.cartItems || [];
-      removeFromExpenseCart = expenseCart?.removeFromCart || ((index: number) => {});
-      updateExpenseItem = expenseCart?.updateItem || ((index: number, item: any) => {});
-      getExpenseCartTotal = expenseCart?.getCartTotal || (() => 0);
-    } catch (error) {
-      // If ExpenseCartProvider is not available, use default values
-      console.warn('ExpenseCartProvider not available');
-    }
+  if (role === 'admin' && expenseCart) {
+    expenseCartItems = expenseCart.cartItems || [];
+    removeFromExpenseCart = expenseCart.removeFromCart || ((index: number) => {});
+    updateExpenseItem = expenseCart.updateItem || ((index: number, item: any) => {});
+    getExpenseCartTotal = expenseCart.getCartTotal || (() => 0);
   }
   
   // Low stock state for admin
@@ -108,65 +119,74 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
           </div>
         </Link>
         <ul className={styles.navList}>
-          {navItems.map((item) => (
-            <li
-              key={item.href}
-              className={pathname === item.href ? styles.active : ''}
-              onClick={() => setSidebarOpen && setSidebarOpen(false)}
-            >
-              <Link href={item.href} className={styles.navLink}>
-                <div suppressHydrationWarning style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                  <span className={styles.icon}>{item.icon}</span>
-                  {item.label}
-                  {/* Show badge for Expense Cart if items > 0 */}
-                  {item.isExpenseCart && expenseCartItems.length > 0 && (
-                    <span style={{
-                      marginLeft: 8,
-                      background: '#8b5cf6',
-                      color: '#fff',
-                      borderRadius: '50%',
-                      width: 22,
-                      height: 22,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      position: 'absolute',
-                      right: -28,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                    }}>{expenseCartItems.length}</span>
-                  )}
-                </div>
-              </Link>
-            </li>
-          ))}
-          {/* Low Stock Alerts link for admin */}
-          {role === 'admin' && (
-            <li
-              className={
-                pathname === '/admin/low-stock'
-                  ? styles.active
-                  : lowStockItems.length > 0
-                  ? styles.lowStockAlert
-                  : ''
-              }
-              onClick={() => setSidebarOpen && setSidebarOpen(false)}
-            >
-              <Link href="/admin/low-stock" className={styles.navLink}>
-                <div suppressHydrationWarning style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className={styles.icon} role="img" aria-label="alert">⚠️</span>
-                  Low Stock Alerts
-                  {lowStockItems.length > 0 && (
-                    <span style={{ marginLeft: 6, fontWeight: 700, color: '#fff', background: '#dc2626', borderRadius: 8, padding: '2px 8px', fontSize: 12 }}>
-                      {lowStockItems.length}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            </li>
-          )}
+          {role === 'admin'
+            ? navSectionsAdmin.map(section => (
+                <React.Fragment key={section.header}>
+                  <div className={styles.sectionHeader}>{section.header}</div>
+                  <ul className={styles.navList}>
+                    {section.items.map(item => (
+                      <li
+                        key={item.href}
+                        className={
+                          pathname === item.href
+                            ? styles.active
+                            : item.isLowStock && lowStockItems.length > 0
+                            ? styles.lowStockAlert
+                            : ''
+                        }
+                        onClick={() => setSidebarOpen && setSidebarOpen(false)}
+                      >
+                        <Link href={item.href} className={styles.navLink}>
+                          <div suppressHydrationWarning style={{ display: 'flex', alignItems: 'center', position: 'relative', gap: 8 }}>
+                            <span className={styles.icon}>{item.icon}</span>
+                            {item.label}
+                            {/* Show badge for Expense Cart if items > 0 */}
+                            {item.isExpenseCart && expenseCartItems.length > 0 && (
+                              <span style={{
+                                marginLeft: 8,
+                                background: '#8b5cf6',
+                                color: '#fff',
+                                borderRadius: '50%',
+                                width: 22,
+                                height: 22,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: 13,
+                                position: 'absolute',
+                                right: -28,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                              }}>{expenseCartItems.length}</span>
+                            )}
+                            {/* Show badge for Low Stock Alerts if items > 0 */}
+                            {item.isLowStock && lowStockItems.length > 0 && (
+                              <span style={{ marginLeft: 6, fontWeight: 700, color: '#fff', background: '#dc2626', borderRadius: 8, padding: '2px 8px', fontSize: 12 }}>
+                                {lowStockItems.length}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </React.Fragment>
+              ))
+            : navItemsUser.map((item) => (
+                <li
+                  key={item.href}
+                  className={pathname === item.href ? styles.active : ''}
+                  onClick={() => setSidebarOpen && setSidebarOpen(false)}
+                >
+                  <Link href={item.href} className={styles.navLink}>
+                    <div suppressHydrationWarning style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                      <span className={styles.icon}>{item.icon}</span>
+                      {item.label}
+                    </div>
+                  </Link>
+                </li>
+              ))}
         </ul>
         
         {/* Cart Items Display - Only show for user role */}
@@ -259,7 +279,6 @@ export default function Sidebar({ sidebarOpen: sidebarOpenProp, setSidebarOpen: 
               borderRadius: 8,
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
               cursor: 'pointer',
-              marginTop: 24
             }}
           >
             Logout

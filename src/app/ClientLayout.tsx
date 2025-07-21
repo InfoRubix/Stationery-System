@@ -35,7 +35,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           style={{
             position: 'relative',
             zIndex: 1001,
-            height: '100vh',
+            minHeight: '100vh',
             transition: 'transform 0.3s',
             transform: sidebarOpen ? 'translateX(0)' : '',
           }}

@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1', 10);
   const limit = parseInt(searchParams.get('limit') || '20', 10);
   const search = (searchParams.get('search') || '').toLowerCase();
+  const inStock = searchParams.get('inStock') === 'true';
+  const outOfStock = searchParams.get('outOfStock') === 'true';
 
   // Use cache if not expired
   if (cache && Date.now() - cache.timestamp < CACHE_DURATION) {
@@ -20,6 +22,11 @@ export async function GET(req: NextRequest) {
       items = items.filter((item: any) =>
         (item["NAMA BARANG"] || '').toLowerCase().includes(search)
       );
+    }
+    if (inStock) {
+      items = items.filter((item: any) => Number(item["CURRENT"]) > 0);
+    } else if (outOfStock) {
+      items = items.filter((item: any) => Number(item["CURRENT"]) === 0);
     }
     const paginated = paginate(items, page, limit);
     return NextResponse.json(paginated);
@@ -33,6 +40,11 @@ export async function GET(req: NextRequest) {
       items = items.filter((item: any) =>
         (item["NAMA BARANG"] || '').toLowerCase().includes(search)
       );
+    }
+    if (inStock) {
+      items = items.filter((item: any) => Number(item["CURRENT"]) > 0);
+    } else if (outOfStock) {
+      items = items.filter((item: any) => Number(item["CURRENT"]) === 0);
     }
     const paginated = paginate(items, page, limit);
     return NextResponse.json(paginated);
