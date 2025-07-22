@@ -93,6 +93,7 @@ export default function AdminRestockPage() {
   const [editName, setEditName] = useState('');
   const [editImage, setEditImage] = useState<File | null>(null);
   const [restockQty, setRestockQty] = useState(1);
+  const [editCurrent, setEditCurrent] = useState('');
   const [editTargetStock, setEditTargetStock] = useState('');
   const [editTargetStockModal, setEditTargetStockModal] = useState<{ open: boolean, item: any, value: string }>({ open: false, item: null, value: '' });
   const [expenseCartModal, setExpenseCartModal] = useState<{ open: boolean, item: any }>({ open: false, item: null });
@@ -214,6 +215,7 @@ export default function AdminRestockPage() {
     setEditName(item["NAMA BARANG"] || '');
     setEditImage(null); // Reset image upload
     setEditTargetStock(item["TARGET STOCK"] || '');
+    setEditCurrent(item["CURRENT"] || '');
     setModalError('');
   };
   const openExpenseCartModal = (item: any) => {
@@ -301,6 +303,7 @@ export default function AdminRestockPage() {
         modalItem["ID"],
         editName,
         imageUrl || modalItem["IMAGE"] || "",
+        editCurrent,
         editTargetStock,
         modalItem["NAMA BARANG"] // oldName
       );
@@ -749,6 +752,17 @@ export default function AdminRestockPage() {
                       type="text"
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
+                      style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                      required
+                    />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontWeight: 500 }}>Edit Current Stock</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editCurrent}
+                      onChange={e => setEditCurrent(e.target.value)}
                       style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
                       required
                     />

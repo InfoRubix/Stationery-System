@@ -210,13 +210,14 @@ export async function restockItem(id: string, addQty: number): Promise<void> {
   }
 }
 
-export async function editItem(id: string, namaBarang: string, image: string, targetStock?: string, oldName?: string): Promise<void> {
+export async function editItem(id: string, namaBarang: string , image: string, current: string, targetStock?: string, oldName?: string): Promise<void> {
   try {
     const formData = new FormData();
     formData.append('action', 'editItem');
     formData.append('id', String(id));
     formData.append('namaBarang', namaBarang);
     formData.append('image', image);
+    formData.append('current', current);
     if (targetStock !== undefined && targetStock !== '') {
       formData.append('targetStock', targetStock);
     }
