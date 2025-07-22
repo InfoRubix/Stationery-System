@@ -7,6 +7,7 @@ export interface CartItem {
   bilangan: number;
   image?: string;
   current: number; // available stock
+  limit: number; // admin-set limit
 }
 
 interface CartContextType {
@@ -46,8 +47,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const existingItem = prevItems.find(cartItem => cartItem.id === item.id);
       
       if (existingItem) {
-        // If item already exists, update quantity (but don't exceed stock)
-        const newQuantity = Math.min(existingItem.bilangan + 1, item.current);
+        // If item already exists, update quantity (but don't exceed admin limit)
+        const maxAllowed = item.limit > 0 ? item.limit : item.current;
+        const newQuantity = Math.min(existingItem.bilangan + 1, maxAllowed);
         return prevItems.map(cartItem =>
           cartItem.id === item.id
             ? { ...cartItem, bilangan: newQuantity }
@@ -73,8 +75,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const item = prevItems.find(cartItem => cartItem.id === id);
       if (!item) return prevItems;
 
-      // Ensure quantity doesn't exceed available stock
-      const newQuantity = Math.min(Math.max(1, quantity), item.current);
+      // Ensure quantity doesn't exceed admin limit (or stock if no limit set)
+      const maxAllowed = item.limit > 0 ? item.limit : item.current;
+      const newQuantity = Math.min(Math.max(1, quantity), maxAllowed);
       
       return prevItems.map(cartItem =>
         cartItem.id === id

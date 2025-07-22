@@ -1,6 +1,8 @@
 // Google Apps Script integration for stationery management system
 // This replaces the Google Sheets API with a simpler Apps Script web app approach
 
+// PDF generation now handled in frontend with jsPDF
+
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPiDhossG-Zu9YEIp4jUskclb15L5jdtvvD1Ynbdy3Iu2PPjWdmwVnv8gfHDko6k5D/exec';
 
 // Types for our data
@@ -22,6 +24,7 @@ export interface ItemLog {
   total: number;
   current: number;
   targetStock: number;
+  limit: number; // Note: Google Sheets uses "LIMIT" field name
 }
 
 export interface LogEntry {
@@ -210,8 +213,9 @@ export async function restockItem(id: string, addQty: number): Promise<void> {
   }
 }
 
-export async function editItem(id: string, namaBarang: string , image: string, current: string, targetStock?: string, oldName?: string): Promise<void> {
+export async function editItem(id: string, namaBarang: string , image: string, current: string, targetStock?: string, limit?: string, oldName?: string): Promise<void> {
   try {
+    console.log('editItem called with:', { id, namaBarang, current, targetStock, limit, oldName });
     const formData = new FormData();
     formData.append('action', 'editItem');
     formData.append('id', String(id));
@@ -220,6 +224,14 @@ export async function editItem(id: string, namaBarang: string , image: string, c
     formData.append('current', current);
     if (targetStock !== undefined && targetStock !== '') {
       formData.append('targetStock', targetStock);
+      console.log('Added targetStock:', targetStock);
+    }
+    // Always send limit parameter, even if empty/0, so Google Apps Script can update it
+    if (limit !== undefined && limit !== null) {
+      formData.append('limit', String(limit)); // Match Google Sheets column name LIMIT
+      console.log('Added limit:', limit);
+    } else {
+      console.log('Skipped limit - value is undefined/null:', limit);
     }
     if (oldName !== undefined && oldName !== '') {
       formData.append('oldName', oldName);
@@ -232,7 +244,9 @@ export async function editItem(id: string, namaBarang: string , image: string, c
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
+    console.log('Google Apps Script editItem response:', result);
     if (result.error) {
+      console.error('Google Apps Script editItem error:', result.error);
       throw new Error(result.error);
     }
   } catch (error) {
@@ -318,4 +332,159 @@ export interface PriceStock {
   tier4Price: number;
   tier5Qty: number;
   tier5Price: number;
+}
+
+/**
+ * Generate a stationery order PDF as a Buffer
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} params.department  
+ * @param {string} params.date
+ * @param {Array<{ namaBarang: string, bilangan: number }>} params.items
+ * @returns {Promise<Uint8Array>} PDF buffer
+ */
+export async function generateOrderPdf({ email, department, date, items }: { email: string, department: string, date: string, items: Array<{ namaBarang: string, bilangan: number }> }): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([500, 600]);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  // Title (year dynamic)
+  const year = new Date().getFullYear();
+  page.drawText(`${year} STATIONERY ORDER FORM`, {
+    x: 30,
+    y: 560,
+    size: 24,
+    font: boldFont,
+  });
+
+  // Order info
+  page.drawText(`Order by :`, { x: 30, y: 535, size: 12, font });
+  page.drawText(email, { x: 95, y: 535, size: 12, font: boldFont });
+  page.drawText(`Date Order :`, { x: 30, y: 520, size: 12, font });
+  page.drawText(date, { x: 110, y: 520, size: 12, font: boldFont });
+  page.drawText(`Department:`, { x: 30, y: 505, size: 12, font });
+  page.drawText(department, { x: 105, y: 505, size: 12, font: boldFont });
+
+  // Table header
+  page.drawRectangle({ x: 30, y: 470, width: 440, height: 30, borderColor: rgb(0,0,0), borderWidth: 1 });
+  page.drawLine({ start: { x: 250, y: 470 }, end: { x: 250, y: 500 }, thickness: 1, color: rgb(0,0,0) });
+  page.drawText('Nama Barang', { x: 40, y: 480, size: 13, font: boldFont });
+  page.drawText('Bilangan Barang', { x: 260, y: 480, size: 13, font: boldFont });
+
+  // Table rows (up to 10)
+  for (let i = 0; i < 10; i++) {
+    const y = 470 - (i + 1) * 30;
+    page.drawRectangle({ x: 30, y, width: 440, height: 30, borderColor: rgb(0,0,0), borderWidth: 1 });
+    page.drawLine({ start: { x: 250, y }, end: { x: 250, y: y + 30 }, thickness: 1, color: rgb(0,0,0) });
+    if (i < items.length) {
+      page.drawText(items[i].namaBarang, { x: 40, y: y + 10, size: 12, font });
+      page.drawText(String(items[i].bilangan), { x: 260, y: y + 10, size: 12, font });
+    }
+  }
+
+  return await pdfDoc.save();
+}
+
+/**
+ * Validate if requested items are within admin limits
+ */
+export async function validateOrderLimits(items: RequestItem[]): Promise<{ valid: boolean; errors: string[] }> {
+  try {
+    const allItems = await getItems();
+    const errors: string[] = [];
+
+    for (const requestedItem of items) {
+      // Google Apps Script returns items with "NAMA BARANG" field
+      const foundItem = allItems.find((item: any) => item["NAMA BARANG"] === requestedItem.namaBarang);
+      
+      if (!foundItem) {
+        errors.push(`Item "${requestedItem.namaBarang}" not found.`);
+        continue;
+      }
+
+      // Check against admin limit if set, otherwise check against stock
+      const limit = foundItem["LIMIT"] || 0;
+      const current = foundItem["CURRENT"] || 0;
+      const maxAllowed = limit > 0 ? limit : current;
+      
+      if (requestedItem.bilangan > maxAllowed) {
+        const limitType = limit > 0 ? "admin limit" : "available stock";
+        errors.push(`Quantity for "${requestedItem.namaBarang}" exceeds ${limitType} (max: ${maxAllowed}, requested: ${requestedItem.bilangan}).`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  } catch (error) {
+    console.error('Error validating order limits:', error);
+    return {
+      valid: false,
+      errors: ['Failed to validate order limits. Please try again.']
+    };
+  }
+}
+
+/**
+ * Enhanced logUsage that generates PDF and includes it in the request
+ */
+export async function logUsageWithPdf(
+  email: string,
+  department: string,
+  items: RequestItem[]
+): Promise<any> {
+  try {
+    // Format date as DD/MM/YYYY HH:mm:ss
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).replace(/,/g, '');
+
+    // Generate PDF
+    const pdfBuffer = await generateOrderPdf({
+      email,
+      department,
+      date: timestamp,
+      items
+    });
+
+    // Convert PDF buffer to base64 for sending to Google Apps Script
+    const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+    
+    const formData = new FormData();
+    formData.append('action', 'logUsageWithPdf');
+    formData.append('email', email);
+    formData.append('department', department);
+    formData.append('items', JSON.stringify(items.map(item => ({ ...item, bilangan: Number(item.bilangan) }))));
+    formData.append('pdfData', pdfBase64);
+    formData.append('timestamp', timestamp);
+
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    return result;
+  } catch (error) {
+    console.error('logUsageWithPdf: Error logging usage with PDF:', error);
+    // Fall back to regular logUsage if PDF generation fails
+    return await logUsage(email, department, items);
+  }
 }

@@ -95,6 +95,7 @@ export default function AdminRestockPage() {
   const [restockQty, setRestockQty] = useState(1);
   const [editCurrent, setEditCurrent] = useState('');
   const [editTargetStock, setEditTargetStock] = useState('');
+  const [editLimit, setEditLimit] = useState('');
   const [editTargetStockModal, setEditTargetStockModal] = useState<{ open: boolean, item: any, value: string }>({ open: false, item: null, value: '' });
   const [expenseCartModal, setExpenseCartModal] = useState<{ open: boolean, item: any }>({ open: false, item: null });
   const [expenseQty, setExpenseQty] = useState(1);
@@ -203,19 +204,14 @@ export default function AdminRestockPage() {
   }, [selectedImage]);
 
   // Open modal handlers
-  const openRestockModal = (item: any) => {
-    setModalType('restock');
-    setModalItem(item);
-    setRestockQty(1);
-    setModalError('');
-  };
   const openEditModal = (item: any) => {
     setModalType('edit');
     setModalItem(item);
     setEditName(item["NAMA BARANG"] || '');
     setEditImage(null); // Reset image upload
-    setEditTargetStock(item["TARGET STOCK"] || '');
+    setEditTargetStock(item["TARGETSTOCK"] || '');
     setEditCurrent(item["CURRENT"] || '');
+    setEditLimit(item["LIMIT"] || '');
     setModalError('');
   };
   const openExpenseCartModal = (item: any) => {
@@ -299,12 +295,14 @@ export default function AdminRestockPage() {
         }
       }
       // Update ITEMLOG using the library function
+      console.log('About to call editItem with limit:', editLimit);
       await editItem(
         modalItem["ID"],
         editName,
         imageUrl || modalItem["IMAGE"] || "",
         editCurrent,
         editTargetStock,
+        editLimit,
         modalItem["NAMA BARANG"] // oldName
       );
       closeModal();
@@ -574,10 +572,31 @@ export default function AdminRestockPage() {
                   }}>
                     <span style={{ marginRight: 6 }}>Current: {item["CURRENT"]}</span>  
                     <span style={{ marginRight: 6 }}>Target Stock: {item["TARGETSTOCK"]}</span>
+                    {(() => {
+                      const current = parseInt(item["CURRENT"]) || 0;
+                      const target = parseInt(item["TARGETSTOCK"]) || 0;
+                      if (target > 0 && current < target) {
+                        return (
+                          <div style={{
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            marginTop: '4px',
+                            textAlign: 'center'
+                          }}>
+                            ⚠️ Low Stock: {target - current} needed
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
-                    <button className={styles.acceptBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openRestockModal(item)}>Restock</button>
                     <button 
                       className={styles.primaryBtn} 
                       style={{ fontSize: 12, padding: '4px 14px', background: '#8b5cf6', border: '1px solid #8b5cf6' }} 
@@ -779,6 +798,17 @@ export default function AdminRestockPage() {
                     />
                   </div>
                   <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontWeight: 500 }}>Admin Limit (0 = no limit)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editLimit}
+                      onChange={e => setEditLimit(e.target.value)}
+                      style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #e5eaf1', fontSize: 16 }}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
                     <label style={{ fontWeight: 500 }}>Change Image (optional)</label>
                     <input
                       type="file"
@@ -871,7 +901,9 @@ export default function AdminRestockPage() {
                     editTargetStockModal.item["ID"],
                     editTargetStockModal.item["NAMA BARANG"],
                     editTargetStockModal.item["IMAGE"] || '',
+                    editTargetStockModal.item["CURRENT"] || '',
                     editTargetStockModal.value,
+                    editTargetStockModal.item["LIMIT"] || '',
                     editTargetStockModal.item["NAMA BARANG"] // oldName
                   );
                   setEditTargetStockModal({ open: false, item: null, value: '' });

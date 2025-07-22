@@ -5,6 +5,8 @@ import styles from "./page.module.css";
 import { useCart } from "../contexts/CartContext";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { getImageSrc } from "@/lib/getImageSrc";
+// @ts-ignore
+import jsPDF from "jspdf";
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -58,6 +60,81 @@ export default function HomePage() {
     }
   };
 
+  // Generate PDF for user stationery order
+  const generateOrderPDF = (userEmail: string, userDepartment: string) => {
+    if (cartItems.length === 0) return null;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const font = 'helvetica';
+    
+    // Helper for date formatting
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const formattedDate = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    // Title (year dynamic)
+    const year = now.getFullYear();
+    doc.setFontSize(24);
+    doc.setFont(font, 'bold');
+    doc.text(`${year} STATIONERY ORDER FORM`, 30, 60);
+
+    // Order info
+    doc.setFontSize(12);
+    doc.setFont(font, 'normal');
+    doc.text(`Order by :`, 30, 100);
+    doc.setFont(font, 'bold');
+    doc.text(userEmail, 95, 100);
+    doc.setFont(font, 'normal');
+    doc.text(`Date Order :`, 30, 120);
+    doc.setFont(font, 'bold');
+    doc.text(formattedDate, 110, 120);
+    doc.setFont(font, 'normal');
+    doc.text(`Department:`, 30, 140);
+    doc.setFont(font, 'bold');
+    doc.text(userDepartment, 105, 140);
+
+    // Table header
+    const headerY = 180;
+    const tableLeftX = 30;
+    const tableRightX = 470;
+    const nameColX = 250;
+    
+    // Draw header background
+    doc.setFillColor(243, 244, 246);
+    doc.rect(tableLeftX, headerY - 15, tableRightX - tableLeftX, 30, 'F');
+    
+    // Draw header borders
+    doc.setLineWidth(1);
+    doc.rect(tableLeftX, headerY - 15, tableRightX - tableLeftX, 30);
+    doc.line(nameColX, headerY - 15, nameColX, headerY + 15);
+    
+    // Header text
+    doc.setFont(font, 'bold');
+    doc.setFontSize(13);
+    doc.text('Nama Barang', 40, headerY + 3);
+    doc.text('Bilangan Barang', 260, headerY + 3);
+
+    // Table rows (up to 10)
+    doc.setFont(font, 'normal');
+    doc.setFontSize(12);
+    for (let i = 0; i < 10; i++) {
+      const y = headerY + 15 + (i * 30);
+      
+      // Draw row border
+      doc.rect(tableLeftX, y, tableRightX - tableLeftX, 30);
+      doc.line(nameColX, y, nameColX, y + 30);
+      
+      // Fill data if available
+      if (i < cartItems.length) {
+        const item = cartItems[i];
+        doc.text(item.namaBarang, 40, y + 20);
+        doc.text(String(item.bilangan), 260, y + 20);
+      }
+    }
+
+    return doc;
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -74,11 +151,18 @@ export default function HomePage() {
       setSubmitting(false);
       return;
     }
-    // Check that all quantities are within stock
+    // Check that all quantities are within admin limit (or stock if no limit set)
     for (const item of cartItems) {
       const found = items.find(i => i["NAMA BARANG"] === item.namaBarang);
-      if (!found || item.bilangan > found["CURRENT"]) {
-        setError(`Quantity for "${item.namaBarang}" exceeds available stock.`);
+      if (!found) {
+        setError(`Item "${item.namaBarang}" not found.`);
+        setSubmitting(false);
+        return;
+      }
+      const maxAllowed = found["LIMIT"] && found["LIMIT"] > 0 ? found["LIMIT"] : found["CURRENT"];
+      if (item.bilangan > maxAllowed) {
+        const limitType = found["LIMIT"] && found["LIMIT"] > 0 ? "admin limit" : "available stock";
+        setError(`Quantity for "${item.namaBarang}" exceeds ${limitType} (max: ${maxAllowed}).`);
         setSubmitting(false);
         return;
       }
@@ -104,14 +188,25 @@ export default function HomePage() {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to submit order');
       }
+
+      // Generate and download PDF
+      const doc = generateOrderPDF(email, department);
+      if (doc) {
+        // Generate filename based on timestamp and user
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const filename = `stationery-order-${department.replace(/\s+/g, '-')}-${timestamp}.pdf`;
+        doc.save(filename);
+      }
+
       setSuccess(true);
       clearCart();
       setEmail('');
       setDepartment('');
-      // Redirect to dashboard after 2 seconds
+      // Redirect to dashboard after 3 seconds to give time for PDF download
       setTimeout(() => {
         router.push('/');
-      }, 2000);
+      }, 3000);
     } catch (err) {
       console.error('Order submission error:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit order');
@@ -161,7 +256,7 @@ export default function HomePage() {
             marginBottom: '16px',
             border: '1px solid #a7f3d0'
           }}>
-            Order submitted successfull 👌
+            Order submitted successfully! Your PDF receipt has been downloaded. 👌
           </div>
         )}
         {error && (

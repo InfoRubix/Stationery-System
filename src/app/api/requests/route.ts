@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logUsage, updateLogStatus, getRequests } from '../../../lib/google-apps-script';
+import { logUsage, updateLogStatus, getRequests, validateOrderLimits } from '../../../lib/google-apps-script';
 
 type RequestStatus = 'PENDING' | 'APPROVE' | 'DECLINE' | 'APPLY';
 
@@ -47,6 +47,15 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    // Validate against admin limits
+    const validation = await validateOrderLimits(body.items);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: `Order validation failed: ${validation.errors.join(', ')}` },
+        { status: 400 }
+      );
     }
 
     // Call Apps Script to log usage and create request

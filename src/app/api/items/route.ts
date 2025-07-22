@@ -95,8 +95,16 @@ export async function PUT(req: Request) {
       if (!body.id) {
         return NextResponse.json({ error: 'Missing id' }, { status: 400 });
       }
-      // Allow partial updates: pass all fields to editItem
-      await editItem(body);
+      // Pass individual parameters to editItem
+      await editItem(
+        String(body.id),
+        String(body.namaBarang || ''),
+        String(body.image || ''),
+        String(body.current || ''),
+        String(body.targetStock || ''),
+        String(body.limit || ''),
+        String(body.oldName || '')
+      );
       return NextResponse.json({ message: 'Edited successfully' });
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

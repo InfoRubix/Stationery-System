@@ -109,6 +109,7 @@ export interface ItemLog {
   bilLog10: number;
   total: number;
   current: number;
+  limit: number;
 }
 
 export interface LogEntry {
@@ -132,7 +133,7 @@ export async function getItems(): Promise<ItemLog[]> {
     
     const response = await sheetsAPI.spreadsheets.values.get({
       spreadsheetId: getSheetId('itemlog'),
-      range: 'ITEMLOG!A2:P', // Skip header row
+      range: 'ITEMLOG!A2:Q', // Skip header row, include LIMIT column
     });
     console.log('getItems: Received response from Google Sheets');
 
@@ -156,6 +157,7 @@ export async function getItems(): Promise<ItemLog[]> {
       bilLog10: parseInt(row[13]) || 0,
       total: parseInt(row[14]) || 0,
       current: parseInt(row[15]) || 0,
+      limit: parseInt(row[16]) || 0,
     }));
   } catch (error) {
     // Print everything about the error
@@ -222,13 +224,14 @@ export async function addItem(item: Omit<ItemLog, 'id'>): Promise<void> {
         item.image,
         '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // bilLog1-10
         '0', // total
-        item.bilangan.toString() // current
+        item.bilangan.toString(), // current
+        '0' // limit (default to 0, admin can set later)
       ]
     ];
 
     await sheetsAPI.spreadsheets.values.append({
       spreadsheetId: getSheetId('itemlog'),
-      range: 'ITEMLOG!A:P',
+      range: 'ITEMLOG!A:Q',
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
@@ -342,7 +345,7 @@ async function updateItemUsage(namaBarang: string, quantity: number): Promise<vo
     // Get current values
     const itemResponse = await sheetsAPI.spreadsheets.values.get({
       spreadsheetId: getSheetId('itemlog'),
-      range: `ITEMLOG!A${itemRow}:P${itemRow}`,
+      range: `ITEMLOG!A${itemRow}:Q${itemRow}`,
     });
 
     const currentValues = itemResponse.data.values?.[0] || [];
