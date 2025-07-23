@@ -6,6 +6,7 @@ import { restockItem } from '@/lib/google-apps-script';
 import React from "react";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { getImageSrc } from "@/lib/getImageSrc";
+import { getItemCardStyle, handleItemCardHover, isMobile, getBaseCardStyle, handleCardHover } from "@/utils/cardStyles";
 import { editItem } from "@/lib/google-apps-script";
 import { useExpenseCart } from "@/contexts/ExpenseCartContext";
 import { getPriceStock } from '@/lib/google-apps-script';
@@ -387,7 +388,7 @@ export default function AdminRestockPage() {
 
   if (loading) return (
     <div className={styles.dashboard}>
-      <div className={styles.card}>
+      <div style={getBaseCardStyle(isMobile())} {...handleCardHover}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 120 }}>
           <DotLoader
             frames={loaderFrames}
@@ -400,7 +401,9 @@ export default function AdminRestockPage() {
   );
   if (error) return (
     <div className={styles.dashboard}>
-      <div className={styles.card}><p style={{ color: "red" }}>{error}</p></div>
+      <div style={getBaseCardStyle(isMobile())} {...handleCardHover}>
+        <p style={{ color: "red" }}>{error}</p>
+      </div>
     </div>
   );
 
@@ -424,7 +427,7 @@ export default function AdminRestockPage() {
           {notification}
         </div>
       )}
-      <div className={styles.card}>
+      <div style={getBaseCardStyle(isMobile())} {...handleCardHover}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className={styles.heading}>Restock & Edit Stock</h1>
           <div style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
@@ -523,8 +526,10 @@ export default function AdminRestockPage() {
               No items found.
             </div>
           ) : (
-            items.map((item, idx) => (
-              <div key={item.ID || item.id || item["NAMA BARANG"] || idx} className={styles.cardItem} style={{ width: 220, minHeight: 290, padding: 20, borderRadius: 16, boxSizing: 'border-box' }}>
+            items.map((item, idx) => {
+              const mobile = isMobile();
+              return (
+              <div key={item.ID || item.id || item["NAMA BARANG"] || idx} style={{ ...getItemCardStyle(mobile), width: 220, minHeight: 290, padding: 20, borderRadius: 16, boxSizing: 'border-box' }} {...handleItemCardHover}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   {getImageSrc(item["IMAGE"]) ? (
                     <img
@@ -607,7 +612,8 @@ export default function AdminRestockPage() {
                   </div>
                 </div>
               </div>
-            ))
+            )
+            })
           )}
         </div>
         {/* Image Modal (move outside grid for correct overlay) */}

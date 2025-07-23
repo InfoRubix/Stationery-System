@@ -4,6 +4,7 @@ import styles from "../page.module.css";
 import { useCart } from "../../contexts/CartContext";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { getImageSrc } from "@/lib/getImageSrc";
+import { getItemCardStyle, handleItemCardHover, isMobile, getBaseCardStyle, handleCardHover } from "@/utils/cardStyles";
 
 const loaderFrames = [
     [14, 7, 0, 8, 6, 13, 20],
@@ -181,7 +182,7 @@ export default function StockPage() {
 
   if (loading) return (
     <div className={styles.dashboard}>
-      <div className={styles.card}>
+      <div style={getBaseCardStyle(isMobile())} {...handleCardHover}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 120 }}>
           <DotLoader
             frames={loaderFrames}
@@ -194,13 +195,15 @@ export default function StockPage() {
   );
   if (error) return (
     <div className={styles.dashboard}>
-      <div className={styles.card}><p style={{ color: "red" }}>{error}</p></div>
+      <div style={getBaseCardStyle(isMobile())} {...handleCardHover}>
+        <p style={{ color: "red" }}>{error}</p>
+      </div>
     </div>
   );
 
   return (
     <div className={styles.dashboard}>
-      <div className={styles.card}>
+      <div style={getBaseCardStyle(isMobile())} {...handleCardHover}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', }}>
       <h1 className={styles.heading}>Stock List</h1>
       <span style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -327,21 +330,20 @@ export default function StockPage() {
             const itemName = item["NAMA BARANG"];
             const imagePath = item["IMAGE"]; // Use the IMAGE column from Google Sheets
             const imageSrc = getImageSrc(imagePath);
+            const mobile = isMobile();
             
             return (
               <div
                 key={item["ID"]}
                 style={{
-                  border: "1px solid #e5eaf1",
-                  borderRadius: 12,
-                  padding: 16,
-                  background: "#f9fafb",
+                  ...getItemCardStyle(mobile),
                   textAlign: "center",
                   minHeight: "200px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between"
                 }}
+                {...handleItemCardHover}
               >
                 <div style={{ 
                   height: "120px", 
