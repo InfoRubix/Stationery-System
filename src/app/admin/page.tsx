@@ -58,6 +58,7 @@ export default function AdminDashboard() {
   const [lastMonthTotal, setLastMonthTotal] = useState(0);
   const [items, setItems] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [priceStock, setPriceStock] = useState<any[]>([]);
 
   useEffect(() => {
       // Fetch items for category lookup
@@ -71,6 +72,10 @@ export default function AdminDashboard() {
     fetch("/api/logs")
       .then(res => res.json())
       .then(data => setLogs(data || []));
+    // Fetch price stock for base prices
+    fetch("/api/price-stock")
+      .then(res => res.json())
+      .then(data => setPriceStock(data || []));
     fetch("/api/expenselog")
       .then(res => res.json())
       .then(data => {
@@ -103,6 +108,35 @@ const itemCategoryMap = React.useMemo(() => {
   return map;
 }, [items]);
 
+// Helper function to parse Malaysian datetime - subtract 1 day to keep 30/06 in June
+const adjustDateForGraphFiltering = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  
+  let d;
+  if (dateStr.includes("/")) {
+    // Malaysian format: DD/MM/YYYY HH:mm:ss
+    const [datePart, timePart] = dateStr.split(" ");
+    const [dStr, mStr, yStr] = datePart.split("/");
+    
+    // Parse the date components
+    d = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr), 12, 0, 0); // Use noon
+    
+    // Subtract 1 day to keep dates in correct month (30/06 stays in June)
+    d.setDate(d.getDate() - 1);
+    
+    // Debug for date changes
+    if (dateStr.includes("30/06")) {
+      console.log(`📅 30/06 - 1 day: "${dateStr}" → Month ${d.getMonth() + 1}, Date ${d.getDate()}`);
+    }
+  } else {
+    d = new Date(dateStr);
+    // Subtract 1 day for non-slash formats too
+    d.setDate(d.getDate() - 1);
+  }
+  
+  return d;
+};
+
 // Build monthly category data for last 6 months
 const now = new Date();
 const categoryMonthlyData: Record<string, Record<string, number>> = {}; // { "2025-1": { "Office": 5, "IT": 3 } }
@@ -116,57 +150,58 @@ for (let i = 5; i >= 0; i--) {
   const monthLogs = logs.filter(log => {
     const dateStr = log.tarikhDanMasa || log["TARIKH DAN MASA"];
     if (!dateStr) return false;
-    let d;
-    if (dateStr.includes("/")) {
-      // Malaysian format: DD/MM/YYYY
-      const [dStr, mStr, yStr] = dateStr.split(" ")[0].split("/");
-      d = new Date(`${yStr}-${mStr}-${dStr}`);
-    } else {
-      d = new Date(dateStr);
-    }
+    const d = adjustDateForGraphFiltering(dateStr);
     return d.getFullYear() === targetDate.getFullYear() && d.getMonth() === targetDate.getMonth();
   });
   
   monthLogs.forEach(log => {
-    (log.items || []).forEach((item: any) => {
-      const name = item.namaBarang;
-      const category = itemCategoryMap[name];
-      if (category && category !== "Unknown") {
-        categoryMonthlyData[monthKey][category] = (categoryMonthlyData[monthKey][category] || 0) + 1;
-      }
-    });
+    // Only process approved orders for category chart
+    const isApproved = log.status === "APPROVE" || log["STATUS"] === "APPROVE";
+    
+    if (isApproved) {
+      (log.items || []).forEach((item: any) => {
+        const name = item.namaBarang;
+        const category = itemCategoryMap[name];
+        if (category && category !== "Unknown") {
+          categoryMonthlyData[monthKey][category] = (categoryMonthlyData[monthKey][category] || 0) + 1;
+        }
+      });
+    }
   });
 }
 
 // For current month data (keep for compatibility with other charts)
 const thisMonth = now.getMonth() + 1;
 const thisYear = now.getFullYear();
+console.log(`Current filtering: Year ${thisYear}, Month ${thisMonth}`);
+
 const logsThisMonth = logs.filter(log => {
   const dateStr = log.tarikhDanMasa || log["TARIKH DAN MASA"];
   if (!dateStr) return false;
-  let d;
-  if (dateStr.includes("/")) {
-    // Malaysian format: DD/MM/YYYY
-    const [dStr, mStr, yStr] = dateStr.split(" ")[0].split("/");
-    d = new Date(`${yStr}-${mStr}-${dStr}`);
-  } else {
-    d = new Date(dateStr);
+  
+  const d = adjustDateForGraphFiltering(dateStr);
+  const matches = d.getFullYear() === thisYear && d.getMonth() + 1 === thisMonth;
+  
+  // Debug what month 30/06 gets assigned to after +1 day
+  if (dateStr.includes("30/06")) {
+    console.log(`📊 30/06 filtering: Adjusted month ${d.getMonth() + 1}, Current month ${thisMonth}, Matches: ${matches}`);
   }
-  return d.getFullYear() === thisYear && d.getMonth() + 1 === thisMonth;
+  
+  return matches;
 });
 
-// Build item name → price lookup from expense log
+// Build item name → price lookup from PRICESTOCK (basePrice)
 const itemPriceMap = React.useMemo(() => {
   const map: Record<string, number> = {};
-  expenseLog.forEach(expense => {
-    const itemName = expense["ITEM NAME"] || expense.itemName;
-    const price = parseFloat(expense["TIER PRICE"] || expense.tierPrice || "0");
-    if (itemName && price > 0) {
-      map[itemName] = price; // Use latest price found
+  priceStock.forEach((priceItem: any) => {
+    const itemName = priceItem["NAMA BARANG"] || priceItem.namaBarang;
+    const basePrice = parseFloat(priceItem["BASE PRICE"] || priceItem.basePrice || "0");
+    if (itemName && basePrice > 0) {
+      map[itemName] = basePrice;
     }
   });
   return map;
-}, [expenseLog]);
+}, [priceStock]);
 
 // Aggregate: Category most purchased (with price)
 const categoryCount: Record<string, number> = {};
@@ -179,28 +214,36 @@ const departmentCount: Record<string, number> = {};
 const departmentValue: Record<string, number> = {}; // Total RM value
 
 logsThisMonth.forEach(log => {
-  (log.items || []).forEach((item: any) => {
-    const name = item.namaBarang;
-    const qty = parseInt(item.bilangan) || 0;
-    const category = itemCategoryMap[name] || "Unknown";
-    const price = itemPriceMap[name] || 0;
-    const value = qty * price;
+  // Only process approved orders for all charts
+  const isApproved = log.status === "APPROVE" || log["STATUS"] === "APPROVE";
+  
+  if (isApproved) {
+    (log.items || []).forEach((item: any) => {
+      const name = item.namaBarang;
+      const qty = parseInt(item.bilangan) || 0;
+      const category = itemCategoryMap[name] || "Unknown";
+      const price = itemPriceMap[name] || 0;
+      const value = qty * price;
+      
+      // Count number of orders per category (1 per item ordered, regardless of quantity)
+      categoryCount[category] = (categoryCount[category] || 0) + 1;
+      categoryValue[category] = (categoryValue[category] || 0) + value;
+      // Only count approved items for most ordered item chart
+      itemCount[name] = (itemCount[name] || 0) + qty;
+      itemValue[name] = (itemValue[name] || 0) + value;
+    });
     
-    // Count number of orders per category (1 per item ordered, regardless of quantity)
-    categoryCount[category] = (categoryCount[category] || 0) + 1;
-    categoryValue[category] = (categoryValue[category] || 0) + value;
-    itemCount[name] = (itemCount[name] || 0) + qty;
-    itemValue[name] = (itemValue[name] || 0) + value;
-  });
-  const dept = log.department || "Unknown";
-  const deptValue = (log.items || []).reduce((sum: number, item: any) => {
-    const qty = parseInt(item.bilangan) || 0;
-    const price = itemPriceMap[item.namaBarang] || 0;
-    return sum + (qty * price);
-  }, 0);
-  const totalQty = (log.items || []).reduce((sum: number, item: any) => sum + (parseInt(item.bilangan) || 0), 0);
-  departmentCount[dept] = (departmentCount[dept] || 0) + totalQty;
-  departmentValue[dept] = (departmentValue[dept] || 0) + deptValue;
+    // Count department orders (already approved)
+    const dept = log.department || "Unknown";
+    const deptValue = (log.items || []).reduce((sum: number, item: any) => {
+      const qty = parseInt(item.bilangan) || 0;
+      const price = itemPriceMap[item.namaBarang] || 0;
+      return sum + (qty * price);
+    }, 0);
+    const totalQty = (log.items || []).reduce((sum: number, item: any) => sum + (parseInt(item.bilangan) || 0), 0);
+    departmentCount[dept] = (departmentCount[dept] || 0) + totalQty;
+    departmentValue[dept] = (departmentValue[dept] || 0) + deptValue;
+  }
 });
 
 // Pie chart data for current month categories
