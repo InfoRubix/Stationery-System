@@ -1,7 +1,8 @@
 // Google Apps Script integration for stationery management system
 // This replaces the Google Sheets API with a simpler Apps Script web app approach
 
-// PDF generation now handled in frontend with jsPDF
+// PDF generation imports
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPiDhossG-Zu9YEIp4jUskclb15L5jdtvvD1Ynbdy3Iu2PPjWdmwVnv8gfHDko6k5D/exec';
 
@@ -24,6 +25,7 @@ export interface ItemLog {
   total: number;
   current: number;
   targetStock: number;
+  category: string;
   limit: number; // Note: Google Sheets uses "LIMIT" field name
 }
 
@@ -109,22 +111,26 @@ export async function getRequests(): Promise<Request[]> {
 // Add new item to ITEMLOG sheet
 export async function addItem(item: Omit<ItemLog, 'id'>): Promise<void> {
   try {
+    const formData = new FormData();
+    formData.append('action', 'addItem');
+    formData.append('namaBarang', item.namaBarang);
+    formData.append('bilangan', String(item.bilangan));
+    formData.append('image', item.image);
+    formData.append('targetStock', String(item.targetStock));
+    formData.append('limit', String(item.limit));
+    formData.append('category', item.category);
+    
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'addItem',
-        namaBarang: item.namaBarang,
-        bilangan: item.bilangan,
-        image: item.image
-      })
+      body: formData,
     });
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    await response.json();
+    const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
   } catch (error) {
     console.error('addItem: Error adding item:', error);
     throw error;
@@ -251,6 +257,28 @@ export async function editItem(id: string, namaBarang: string , image: string, c
     }
   } catch (error) {
     console.error('editItem: Error editing item:', error);
+    throw error;
+  }
+}
+
+export async function deleteItem(id: string): Promise<void> {
+  try {
+    const formData = new FormData();
+    formData.append('action', 'deleteItem');
+    formData.append('id', String(id));
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    console.error('deleteItem: Error deleting item:', error);
     throw error;
   }
 }

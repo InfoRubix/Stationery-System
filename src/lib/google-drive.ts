@@ -1,7 +1,7 @@
 // Google Drive integration for image uploads
 // This replaces local file storage with Google Drive storage
 
-const GOOGLE_DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbzcCOnAk_OF6gXGl-pxY1RlEwuEAUnyE_7sriH3ga8FnYJAv3HlSpu0CNGgxqaJxET5/exec';
+const GOOGLE_DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbwPiDhossG-Zu9YEIp4jUskclb15L5jdtvvD1Ynbdy3Iu2PPjWdmwVnv8gfHDko6k5D/exec';
 
 export interface DriveFile {
   id: string;

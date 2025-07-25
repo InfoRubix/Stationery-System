@@ -7,7 +7,7 @@ import React from "react";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { getImageSrc } from "@/lib/getImageSrc";
 import { getItemCardStyle, handleItemCardHover, isMobile, getBaseCardStyle, handleCardHover } from "@/utils/cardStyles";
-import { editItem } from "@/lib/google-apps-script";
+import { editItem, deleteItem } from "@/lib/google-apps-script";
 import { useExpenseCart } from "@/contexts/ExpenseCartContext";
 import { getPriceStock } from '@/lib/google-apps-script';
 
@@ -103,6 +103,8 @@ export default function AdminRestockPage() {
   const [expenseTier, setExpenseTier] = useState('');
   const [priceStockList, setPriceStockList] = useState<any[]>([]);
   const [notification, setNotification] = useState('');
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean, item: any }>({ open: false, item: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Restore last page from localStorage on mount
   useEffect(() => {
@@ -229,6 +231,12 @@ export default function AdminRestockPage() {
     setExpenseCartModal({ open: false, item: null });
     setExpenseQty(1);
     setExpenseTier('');
+  };
+  const openDeleteModal = (item: any) => {
+    setDeleteModal({ open: true, item });
+  };
+  const closeDeleteModal = () => {
+    setDeleteModal({ open: false, item: null });
   };
 
   // API call for restock
@@ -371,6 +379,22 @@ export default function AdminRestockPage() {
     closeExpenseCartModal();
     setNotification('Item added to expense cart!');
     setTimeout(() => setNotification(''), 2500);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteModal.item) return;
+    setDeleteLoading(true);
+    try {
+      await deleteItem(deleteModal.item["ID"]);
+      closeDeleteModal();
+      fetchItems();
+      setNotification('Item deleted successfully!');
+      setTimeout(() => setNotification(''), 2500);
+    } catch (err) {
+      alert('Failed to delete item.');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   // Helper to get display price for an item
@@ -600,14 +624,23 @@ export default function AdminRestockPage() {
                       return null;
                     })()}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className={styles.primaryBtn} style={{ fontSize: 12, padding: '4px 14px' }} onClick={() => openEditModal(item)}>Edit</button>
+                      <button 
+                        className={styles.primaryBtn} 
+                        style={{ fontSize: 12, padding: '4px 14px', background: '#8b5cf6', border: '1px solid #8b5cf6' }} 
+                        onClick={() => openExpenseCartModal(item)}
+                      >
+                        Add to Cart
+                      </button>
+                    </div>
                     <button 
                       className={styles.primaryBtn} 
-                      style={{ fontSize: 12, padding: '4px 14px', background: '#8b5cf6', border: '1px solid #8b5cf6' }} 
-                      onClick={() => openExpenseCartModal(item)}
+                      style={{ fontSize: 12, padding: '4px 14px', background: '#dc2626', border: '1px solid #dc2626' }} 
+                      onClick={() => openDeleteModal(item)}
                     >
-                      Add to Cart
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -1043,6 +1076,110 @@ export default function AdminRestockPage() {
               >
                 Add to Cart
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {deleteModal.open && deleteModal.item && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px"
+          }}
+          onClick={e => { if (e.target === e.currentTarget) closeDeleteModal(); }}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: 400,
+              width: "100%",
+              background: "white",
+              borderRadius: "12px",
+              padding: "28px 24px 24px 24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center"
+            }}
+          >
+            <button
+              onClick={closeDeleteModal}
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "15px",
+                border: "none",
+                fontSize: "24px",
+                cursor: "pointer",
+                color: "#666",
+                zIndex: 1001,
+                width: "30px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.1)"
+              }}
+              aria-label="Close modal"
+            >
+              ×
+            </button>
+            <h2 style={{ fontWeight: 700, fontSize: 20, marginBottom: 18, color: '#dc2626' }}>
+              Delete Item
+            </h2>
+            <div style={{ width: '100%', textAlign: 'center' }}>
+              <p style={{ marginBottom: 16, color: '#374151' }}>
+                Are you sure you want to delete <strong>"{deleteModal.item["NAMA BARANG"]}"</strong>?
+              </p>
+              <p style={{ marginBottom: 24, color: '#6b7280', fontSize: 14 }}>
+                This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button
+                  onClick={closeDeleteModal}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: 6,
+                    border: '1px solid #d1d5db',
+                    background: '#f9fafb',
+                    color: '#374151',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: 6,
+                    border: '1px solid #dc2626',
+                    background: '#dc2626',
+                    color: 'white',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                    opacity: deleteLoading ? 0.7 : 1
+                  }}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

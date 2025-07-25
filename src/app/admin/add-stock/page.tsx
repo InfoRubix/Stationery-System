@@ -25,6 +25,9 @@ const loaderFrames = [
 export default function AddStockPage() {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [targetStock, setTargetStock] = useState("");
+  const [limit, setLimit] = useState("");
+  const [category, setCategory] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +50,7 @@ export default function AddStockPage() {
     setSuccess(false);
 
     if (!name || !quantity || !imageFile) {
-      setError("All fields are required.");
+      setError("Name, quantity, and image are required.");
       return;
     }
 
@@ -55,6 +58,9 @@ export default function AddStockPage() {
     const formData = new FormData();
     formData.append("name", name);
     formData.append("quantity", quantity);
+    formData.append("targetStock", targetStock || "0");
+    formData.append("limit", limit || "0");
+    formData.append("category", category || "");
     formData.append("image", imageFile);
 
     try {
@@ -67,6 +73,9 @@ export default function AddStockPage() {
       setSuccess(true);
       setName("");
       setQuantity("");
+      setTargetStock("");
+      setLimit("");
+      setCategory("");
       setImageFile(null);
       setPreview(null);
     } catch (err: any) {
@@ -145,6 +154,67 @@ export default function AddStockPage() {
               style={{ width: '100%' }}
             />
           </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
+              Target Stock
+            </label>
+            <input
+              type="number"
+              value={targetStock}
+              onChange={e => setTargetStock(e.target.value)}
+              className={styles.input}
+              min={0}
+              placeholder="0"
+              style={{ width: '100%' }}
+            />
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Minimum stock level for low stock alerts (0 = no alerts)
+            </div>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
+              Admin Limit
+            </label>
+            <input
+              type="number"
+              value={limit}
+              onChange={e => setLimit(e.target.value)}
+              className={styles.input}
+              min={0}
+              placeholder="0"
+              style={{ width: '100%' }}
+            />
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Maximum quantity users can request (0 = no limit)
+            </div>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
+              Category
+            </label>
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              className={styles.input}
+              style={{ width: '100%' }}
+            >
+              <option value="">Select a category</option>
+              <option value="Paper & Envelopes">Paper & Envelopes</option>
+              <option value="Labels, Notes & Tabs">Labels, Notes & Tabs</option>
+              <option value="Accessories & Others">Accessories & Others</option>
+              <option value="Pens, Markers & Writing Tools">Pens, Markers & Writing Tools</option>
+              <option value="Batteries & Electronics">Batteries & Electronics</option>
+              <option value="Binding & Clips">Binding & Clips</option>
+              <option value="Adhesives & Tapes">Adhesives & Tapes</option>
+              <option value="Correction & Erasing">Correction & Erasing</option>
+              <option value="Staplers & Staples">Staplers & Staples</option>
+              <option value="Files & Filling Accessories">Files & Filling Accessories</option>
+            </select>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Select item category (optional)
+            </div>
+          </div>
+          
           <div style={{ marginBottom: 24 }}>
             <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
               Image
