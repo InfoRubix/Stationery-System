@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, status, email, department, items } = body;
+    const { id, status, email, department, items, originalItems, stockRestoration } = body;
 
     if (!id || !status) {
       return NextResponse.json(
@@ -120,7 +120,9 @@ export async function PUT(req: NextRequest) {
         status: status as RequestStatus,
         email,
         department,
-        items
+        items,
+        originalItems,
+        stockRestoration
       });
 
       // Return the updated request

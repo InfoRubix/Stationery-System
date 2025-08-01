@@ -52,6 +52,8 @@ interface Request {
   department: string;
   items: RequestItem[];
   status: 'PENDING' | 'APPROVE' | 'DECLINE' | 'APPLY';
+  originalItems?: RequestItem[];
+  stockRestoration?: RequestItem[];
 }
 
 // Get all items from ITEMLOG sheet
@@ -177,6 +179,14 @@ export async function updateLogStatus(request: Request): Promise<any> {
     formData.append('email', request.email);
     formData.append('department', request.department);
     formData.append('items', JSON.stringify(request.items.map(item => ({ ...item, bilangan: Number(item.bilangan) }))));
+    
+    if (request.originalItems) {
+      formData.append('originalItems', JSON.stringify(request.originalItems.map(item => ({ ...item, bilangan: Number(item.bilangan) }))));
+    }
+    
+    if (request.stockRestoration && request.stockRestoration.length > 0) {
+      formData.append('stockRestoration', JSON.stringify(request.stockRestoration.map(item => ({ ...item, bilangan: Number(item.bilangan) }))));
+    }
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       body: formData,

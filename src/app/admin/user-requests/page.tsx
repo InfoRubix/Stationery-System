@@ -42,6 +42,7 @@ interface Request {
   department: string;
   items: RequestItem[];
   status: RequestStatus;
+  originalItems?: RequestItem[];
 }
 
 export default function UserRequestsPage() {
@@ -50,6 +51,10 @@ export default function UserRequestsPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+  const [editingRequest, setEditingRequest] = useState<Request | null>(null);
+  const [editItems, setEditItems] = useState<RequestItem[]>([]);
+  const [originalItems, setOriginalItems] = useState<RequestItem[]>([]);
+  const [editLoading, setEditLoading] = useState(false);
   const router = useRouter();
 
   // Fetch live low stock items
@@ -145,6 +150,119 @@ export default function UserRequestsPage() {
     router.push('/admin/low-stock');
   };
 
+  const handleEditRequest = (request: Request) => {
+    setEditingRequest(request);
+    setEditItems([...request.items]);
+    setOriginalItems([...request.items]);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRequest(null);
+    setEditItems([]);
+    setOriginalItems([]);
+  };
+
+  const handleItemQuantityChange = (index: number, newQuantity: number) => {
+    if (newQuantity < 0) return;
+    
+    // Find the original quantity for this item to prevent increases
+    const currentItem = editItems[index];
+    const originalItem = originalItems.find(item => item.namaBarang === currentItem.namaBarang);
+    const maxAllowed = originalItem ? originalItem.bilangan : currentItem.bilangan;
+    
+    // Don't allow quantity to exceed original amount
+    if (newQuantity > maxAllowed) {
+      alert(`Cannot increase quantity beyond original amount (max: ${maxAllowed})`);
+      return;
+    }
+    
+    setEditItems(prev => 
+      prev.map((item, i) => 
+        i === index ? { ...item, bilangan: newQuantity } : item
+      )
+    );
+  };
+
+
+  const handleSaveEdit = async () => {
+    if (!editingRequest) return;
+    
+    const filteredItems = editItems.filter(item => item.bilangan > 0);
+    if (filteredItems.length === 0) {
+      alert('At least one item with quantity > 0 is required');
+      return;
+    }
+
+    // Final validation: ensure no quantities exceed original amounts
+    for (const item of editItems) {
+      const originalItem = originalItems.find(orig => orig.namaBarang === item.namaBarang);
+      if (originalItem && item.bilangan > originalItem.bilangan) {
+        alert(`Quantity for "${item.namaBarang}" cannot exceed original amount (${originalItem.bilangan})`);
+        return;
+      }
+    }
+
+    // Calculate stock differences for restoration (item-by-item comparison)
+    const itemsToRestore: RequestItem[] = [];
+    
+    // Find items that were removed or had quantities reduced
+    originalItems.forEach(originalItem => {
+      const matchingNewItem = editItems.find(newItem => 
+        newItem.namaBarang === originalItem.namaBarang
+      );
+      
+      if (!matchingNewItem) {
+        // Item was completely removed - restore full quantity
+        itemsToRestore.push({
+          namaBarang: originalItem.namaBarang,
+          bilangan: originalItem.bilangan
+        });
+      } else if (matchingNewItem.bilangan < originalItem.bilangan) {
+        // Item quantity was reduced - restore the difference
+        itemsToRestore.push({
+          namaBarang: originalItem.namaBarang,
+          bilangan: originalItem.bilangan - matchingNewItem.bilangan
+        });
+      }
+    });
+
+    setEditLoading(true);
+    try {
+      const response = await fetch('/api/requests', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingRequest.id,
+          status: editingRequest.status,
+          email: editingRequest.email,
+          department: editingRequest.department,
+          items: editItems, // Send all items including those with 0 quantity for logging
+          originalItems: originalItems,
+          stockRestoration: itemsToRestore
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update request');
+      }
+
+      setRequests(prev => 
+        prev.map(req => 
+          req.id === editingRequest.id 
+            ? { ...req, items: editItems, originalItems: originalItems } // Store original items for comparison
+            : req
+        )
+      );
+
+      handleCancelEdit();
+    } catch (error) {
+      console.error('Failed to update request:', error);
+      alert('Failed to update request. Please try again.');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   return (
     <div className={styles.dashboard}>
       <div className={styles.card} style={{ overflowX: "auto" }}>
@@ -236,9 +354,16 @@ export default function UserRequestsPage() {
                     <td>{req.email || 'N/A'}</td>
                     <td>{req.department}</td>
                     <td>
-                      {req.items.map((item, i) => (
+                      {req.items.map((item, i) => {
+                        // Check if this request has originalItems stored (from editing)
+                        const hasOriginal = req.originalItems && req.originalItems.length > 0;
+                        const originalItem = hasOriginal ? req.originalItems?.find(orig => orig.namaBarang === item.namaBarang) : null;
+                        const wasReduced = originalItem && item.bilangan > 0 && item.bilangan < originalItem.bilangan;
+                        const wasRejected = item.bilangan === 0;
+                        
+                        return (
                         <div key={`${item.namaBarang}-${i}`} style={{
-                          background: "#f3f4f6",
+                          background: wasRejected ? "#fee2e2" : wasReduced ? "#fef3c7" : "#f3f4f6",
                           borderRadius: 8,
                           padding: "6px 10px",
                           marginBottom: 6,
@@ -246,12 +371,26 @@ export default function UserRequestsPage() {
                           fontSize: "0.98em",
                           display: "flex",
                           justifyContent: "space-between",
-                          alignItems: "center"
+                          alignItems: "center",
+                          opacity: wasRejected ? 0.7 : wasReduced ? 0.85 : 1,
+                          textDecoration: wasRejected ? "line-through" : "none"
                         }}>
-                          <span>{item.namaBarang}</span>
-                          <span style={{ color: "#64748b", marginLeft: 8 }}>x{item.bilangan}</span>
+                          <span style={{ 
+                            color: wasRejected ? "#dc2626" : wasReduced ? "#d97706" : "inherit" 
+                          }}>
+                            {item.namaBarang}
+                            {wasRejected && <span style={{ fontSize: "11px", marginLeft: "6px" }}>(rejected)</span>}
+                            {wasReduced && originalItem && <span style={{ fontSize: "11px", marginLeft: "6px" }}>(reduced from {originalItem.bilangan})</span>}
+                          </span>
+                          <span style={{ 
+                            color: wasRejected ? "#dc2626" : wasReduced ? "#d97706" : "#64748b", 
+                            marginLeft: 8 
+                          }}>
+                            x{item.bilangan}
+                          </span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </td>
                     <td>
                       <span
@@ -269,6 +408,23 @@ export default function UserRequestsPage() {
                     <td>
                       {req.status === "PENDING" && (
                         <>
+                          <button
+                            onClick={() => handleEditRequest(req)}
+                            disabled={actionLoading === req.id}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#f59e0b',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: actionLoading === req.id ? 'wait' : 'pointer',
+                              opacity: actionLoading === req.id ? 0.7 : 1,
+                              fontSize: '12px',
+                              marginRight: '6px'
+                            }}
+                          >
+                            Edit
+                          </button>
                           <button
                             className={styles.acceptBtn}
                             onClick={() => handleRequestAction(req.id, "APPROVE")}
@@ -301,6 +457,117 @@ export default function UserRequestsPage() {
           </tbody>
         </table>
       </div>
+
+      {editingRequest && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <h2 style={{ marginTop: 0, marginBottom: '20px' }}>
+              Edit Request - {editingRequest.email}
+            </h2>
+            <p style={{ marginBottom: '20px', color: '#666' }}>
+              Department: {editingRequest.department}
+            </p>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <h3 style={{ marginBottom: '12px' }}>Items:</h3>
+              {editItems.map((item, index) => {
+                const originalItem = originalItems.find(orig => orig.namaBarang === item.namaBarang);
+                const maxAllowed = originalItem ? originalItem.bilangan : item.bilangan;
+                return (
+                  <div key={index} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '12px',
+                    padding: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px'
+                  }}>
+                    <span style={{ flex: 1, fontWeight: '500' }}>
+                      {item.namaBarang}
+                      <span style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
+                        (max: {maxAllowed})
+                      </span>
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={maxAllowed}
+                      value={item.bilangan}
+                      onChange={(e) => handleItemQuantityChange(index, parseInt(e.target.value) || 0)}
+                      style={{
+                        width: '80px',
+                        padding: '6px 8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <span style={{ fontSize: '12px', color: '#666' }}>
+                      Set to 0 to remove
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={handleCancelEdit}
+                disabled={editLoading}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: editLoading ? 'wait' : 'pointer',
+                  opacity: editLoading ? 0.7 : 1
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={editLoading}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: editLoading ? 'wait' : 'pointer',
+                  opacity: editLoading ? 0.7 : 1
+                }}
+              >
+                {editLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
